@@ -40,11 +40,13 @@ int    g_pending_transaction_type = -1;
 
 int OnInit()
   {
-   if(StringLen(ApiBaseUrl)<8 || (StringFind(ApiBaseUrl,"https://")!=0 && StringFind(ApiBaseUrl,"http://localhost")!=0))
+   if(StringLen(ApiBaseUrl)<8 || (StringFind(ApiBaseUrl,"https://")!=0 && StringFind(ApiBaseUrl,"http://localhost")!=0 && StringFind(ApiBaseUrl,"http://fundedfence.ddns.net")!=0))
      {
-      Print("FundedFence: ApiBaseUrl must use HTTPS (localhost is allowed for development). ");
+      Print("FundedFence: ApiBaseUrl must use HTTPS. Temporary HTTP is allowed for localhost and fundedfence.ddns.net during deployment testing.");
       return(INIT_PARAMETERS_INCORRECT);
      }
+   if(StringFind(ApiBaseUrl,"http://fundedfence.ddns.net")==0)
+      Print("FundedFence: warning - using temporary HTTP endpoint. Move to HTTPS before production use.");
    if(ActiveSnapshotSeconds<1 || IdleSnapshotSeconds<2 || RequestTimeoutMs<250 || CurrencyExponent<0 || CurrencyExponent>6)
       return(INIT_PARAMETERS_INCORRECT);
 
