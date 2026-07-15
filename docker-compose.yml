@@ -1,0 +1,46 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env.oci
+    environment:
+      POSTGRES_URL: postgres://fundedfence:${POSTGRES_PASSWORD}@db:5432/fundedfence
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fundedfence
+      POSTGRES_USER: fundedfence
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - fundedfence_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fundedfence -d fundedfence"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    env_file:
+      - .env.oci
+    ports:
+      - "${FUNDEDFENCE_HTTP_PORT:-8080}:80"
+      - "${FUNDEDFENCE_HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - fundedfence_caddy_data:/data
+      - fundedfence_caddy_config:/config
+
+volumes:
+  fundedfence_postgres:
+  fundedfence_caddy_data:
+  fundedfence_caddy_config:

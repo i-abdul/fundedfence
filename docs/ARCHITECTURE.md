@@ -2,7 +2,7 @@
 
 ## Shape
 
-PropShield starts as a TypeScript modular monolith deployed as a Cloudflare-compatible Vinext application. The web UI, API routes, domain calculations, persistence adapters, and scheduled work share one deployable boundary while retaining domain module seams. This keeps the MVP operable without premature microservices.
+FundedFence starts as a TypeScript modular monolith deployed as a Cloudflare-compatible Vinext application. The web UI, API routes, domain calculations, persistence adapters, and scheduled work share one deployable boundary while retaining domain module seams. This keeps the MVP operable without premature microservices.
 
 ```text
 MT5 EA -> HTTPS pairing/ingestion -> validation + connector auth
@@ -15,7 +15,7 @@ MT5 EA -> HTTPS pairing/ingestion -> validation + connector auth
 
 | Module | Responsibility | Current location |
 |---|---|---|
-| Identity | Hosting-managed user identity and server-side ownership checks | `app/chatgpt-auth.ts` |
+| Identity | App-owned email/password sessions plus Google OAuth hooks | `lib/server/auth.ts` |
 | Pairing | Single-use codes, source throttling, device issuance, refresh | `app/api/v1/pairing-codes`, `app/api/v1/connector` |
 | Connector protocol | Canonical envelopes, HMAC signatures, device tokens, replay window | `lib/domain/connector-protocol.ts` |
 | Ingestion | Sequence/idempotency checks, raw events, snapshots, positions, freshness | `app/api/v1/connector/events` |
@@ -52,7 +52,7 @@ Connection states derive from heartbeat age: live at 15 seconds or less, delayed
 
 ## Authentication and authorization
 
-Browser identity is dispatch-owned Sign in with ChatGPT. Public marketing pages remain anonymous. Every account API checks the forwarded identity on the server and joins through the account owner; client-side visibility is never authorization. Connector identity is separate, short-lived, account-scoped, refreshable, and revocable.
+Browser identity is owned by FundedFence through signed HTTP-only sessions. Email/password works without an external provider; Google OAuth is enabled when the deployment has Google client credentials. Public marketing pages remain anonymous. Every account API checks the signed session on the server and joins through the account owner; client-side visibility is never authorization. Connector identity is separate, short-lived, account-scoped, refreshable, and revocable.
 
 ## Deployment
 

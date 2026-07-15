@@ -2,7 +2,7 @@
 
 ## Safety boundary
 
-`connector/PropShieldConnector.mq5` is an Expert Advisor only because MT5 permits `WebRequest` from EAs/scripts, not indicators. It is a data connector and contains no order placement, order modification, position close, stop-loss change, take-profit change, lot-sizing, copy-trading, signal, grid, or martingale logic.
+`connector/FundedFenceConnector.mq5` is an Expert Advisor only because MT5 permits `WebRequest` from EAs/scripts, not indicators. It is a data connector and contains no order placement, order modification, position close, stop-loss change, take-profit change, lot-sizing, copy-trading, signal, grid, or martingale logic.
 
 The prototype reads account state, open positions, pending-order count, terminal health, and trade-transaction identifiers. `OnTradeTransaction` performs no network I/O; it marks state dirty and lets `OnTimer` send the signed event and reconciliation.
 
@@ -35,9 +35,9 @@ The EA implements standard HMAC-SHA256 with 64-byte inner/outer pads, using MT5 
 
 ## Installation
 
-Current manual path: download source, place in `MQL5/Experts/PropShield`, compile in MetaEditor, allow the site origin under Tools -> Options -> Expert Advisors, attach to one chart, and enter the pairing code.
+Current manual path: download source, place in `MQL5/Experts/FundedFence`, compile in MetaEditor, allow the site origin under Tools -> Options -> Expert Advisors, attach to one chart, and enter the pairing code.
 
-The production `PropShield Desktop Connector` remains a next-loop deliverable. It must detect terminals, copy the reviewed binary, guide WebRequest allowlisting, store credentials with Windows protection, show diagnostics, update securely, uninstall cleanly, and be code-signed.
+The production `FundedFence Desktop Connector` remains a next-loop deliverable. It must detect terminals, copy the reviewed binary, guide WebRequest allowlisting, store credentials with Windows protection, show diagnostics, update securely, uninstall cleanly, and be code-signed.
 
 ## Verification required before release
 

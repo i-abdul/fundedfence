@@ -100,7 +100,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
         <article className="panel timeline-panel"><div className="panel-heading"><div><p className="eyebrow">Audit trail</p><h2>Account timeline</h2></div><span className="panel-count">Today</span></div><div className="timeline-list"><Timeline time="14:32" title="Risk state recalculated" detail="Snapshot sequence 8,214 · all rule buffers healthy" tone="healthy" /><Timeline time="14:29" title="Stop-loss changed" detail="EURUSD stop moved to 1.08180 · risk reduced by $240" tone="neutral" /><Timeline time="14:17" title="News caution window" detail="Illustrative event restriction begins in 13 minutes" tone="caution" /><Timeline time="13:58" title="Connector heartbeat" detail="Round-trip 184 ms · sequence continuous" tone="healthy" /></div></article>
         <article className="panel protection-panel"><span className="protection-mark">✓</span><p className="eyebrow">Read-only by design</p><h2>Your terminal stays in control.</h2><p>The connector observes account data and sends signed events. It contains no order placement, modification, or closing calls.</p><Link className="quiet-link" href="/pairing">Review connector setup →</Link></article>
       </section>
-      <footer className="product-footer"><span>PropShield provides risk-monitoring tools, not financial advice or a guarantee of challenge success.</span><span>Data shown here is illustrative.</span></footer>
+      <footer className="product-footer"><span>FundedFence provides risk-monitoring tools, not financial advice or a guarantee of challenge success.</span><span>Data shown here is illustrative.</span></footer>
     </main>
   );
 }

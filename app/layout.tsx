@@ -21,18 +21,18 @@ export async function generateMetadata(): Promise<Metadata> {
   const description = "Read-only MT5 monitoring, explainable prop-firm risk calculations, and early warnings before an accidental account breach.";
   return {
     metadataBase: new URL(origin),
-    title: { default: "PropShield — Prop account protection", template: "%s · PropShield" },
+    title: { default: "FundedFence — Prop account protection", template: "%s · FundedFence" },
     description,
-    applicationName: "PropShield",
+    applicationName: "FundedFence",
     openGraph: {
       type: "website",
-      title: "PropShield — Prop account protection",
+      title: "FundedFence — Prop account protection",
       description,
       url: origin,
-      siteName: "PropShield",
-      images: [{ url: `${origin}/og.png`, width: 1734, height: 909, alt: "PropShield read-only MT5 account health monitoring" }],
+      siteName: "FundedFence",
+      images: [{ url: `${origin}/og.png`, width: 1734, height: 909, alt: "FundedFence read-only MT5 account health monitoring" }],
     },
-    twitter: { card: "summary_large_image", title: "PropShield — Prop account protection", description, images: [`${origin}/og.png`] },
+    twitter: { card: "summary_large_image", title: "FundedFence — Prop account protection", description, images: [`${origin}/og.png`] },
   };
 }
 

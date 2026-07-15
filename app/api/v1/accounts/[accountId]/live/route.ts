@@ -1,4 +1,4 @@
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getAppUser } from "@/lib/server/auth";
 import { jsonError } from "@/lib/server/http";
 import { requireDatabase } from "@/lib/server/runtime";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_request: Request, context: { params: Promise<{ accountId: string }> }): Promise<Response> {
   const correlationId = crypto.randomUUID();
   try {
-    const user = await getChatGPTUser();
+    const user = await getAppUser();
     if (!user) return jsonError(401, "authentication_required", "Sign in to view account data.", correlationId);
     const { accountId } = await context.params;
     if (!/^acct_[a-f0-9]{32}$/.test(accountId)) return jsonError(400, "account_id_invalid", "The account identifier is invalid.", correlationId);

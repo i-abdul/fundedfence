@@ -6,7 +6,7 @@ Status: accepted. The empty repository was initialized with the supported Vinext
 
 ## ADR-002 — Hosting identity, not app passwords
 
-Status: accepted. Dispatch-owned Sign in with ChatGPT supplies browser identity. PropShield stores a tenant user record but no password, reset token, or external OAuth secret. Sign-up/login screens hand off to the hosting flow.
+Status: superseded for OCI. FundedFence now owns browser identity through signed HTTP-only sessions. Email/password is available immediately, Google OAuth is wired through deployment environment variables, and SMTP password reset remains pending provider setup.
 
 ## ADR-003 — D1 for structured durable state
 

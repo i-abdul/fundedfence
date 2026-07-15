@@ -1,4 +1,4 @@
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getAppUser } from "@/lib/server/auth";
 import { generatePairingCode, hashPairingCode } from "@/lib/domain/pairing";
 import { jsonError, safeJson } from "@/lib/server/http";
 import { stableId } from "@/lib/server/crypto";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request): Promise<Response> {
   const correlationId = crypto.randomUUID();
   try {
-    const user = await getChatGPTUser();
+    const user = await getAppUser();
     if (!user) return jsonError(401, "authentication_required", "Sign in before creating a pairing code.", correlationId);
     const body = await safeJson(request);
     const accountLabel = requiredText(body.accountLabel, "accountLabel", 80);

@@ -5,6 +5,7 @@ import {
   verifyEnvelopeSignature,
 } from "@/lib/domain/connector-protocol";
 import { sha256Hex, stableId } from "@/lib/server/crypto";
+import type { AppDatabase, AppPreparedStatement } from "@/lib/server/database";
 import { isCanonicalMinorUnits, jsonError, readBearerToken } from "@/lib/server/http";
 import { requireDatabase, requireSecret } from "@/lib/server/runtime";
 
@@ -28,7 +29,7 @@ export async function POST(request: Request): Promise<Response> {
   const correlationId = crypto.randomUUID();
   try {
     const accessToken = readBearerToken(request);
-    const signature = request.headers.get("x-propshield-signature") ?? "";
+    const signature = request.headers.get("x-fundedfence-signature") ?? "";
     if (!accessToken || !signature) return jsonError(401, "connector_auth_required", "Connector authentication and signature are required.", correlationId);
     const secret = await requireSecret("CONNECTOR_TOKEN_SECRET");
     const claims = await verifyDeviceToken(accessToken, secret);
@@ -62,7 +63,7 @@ export async function POST(request: Request): Promise<Response> {
     const eventHash = await sha256Hex(envelopeJson);
     const previousAudit = await database.prepare("SELECT event_hash FROM audit_events WHERE organization_id = ? ORDER BY occurred_at DESC, id DESC LIMIT 1")
       .bind(device.organization_id).first<{ event_hash: string }>();
-    const statements: D1PreparedStatement[] = [
+    const statements: AppPreparedStatement[] = [
       database.prepare("INSERT INTO trade_events (id, trading_account_id, connector_device_id, idempotency_key, sequence, event_type, occurred_at, payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
         .bind(eventId, claims.accountId, claims.deviceId, envelope.idempotencyKey, envelope.sequence, envelope.eventType, envelope.occurredAt, JSON.stringify(envelope.payload), nowIso, nowIso),
       database.prepare("UPDATE connector_devices SET last_sequence = ?, updated_at = ? WHERE id = ? AND last_sequence < ?")
@@ -107,10 +108,10 @@ function parseSnapshotAccount(value: unknown): SnapshotAccount {
   return record as SnapshotAccount;
 }
 
-async function positionStatements(database: D1Database, accountId: string, value: unknown, nowIso: string): Promise<D1PreparedStatement[]> {
+async function positionStatements(database: AppDatabase, accountId: string, value: unknown, nowIso: string): Promise<AppPreparedStatement[]> {
   if (!Array.isArray(value)) throw new Error("Snapshot positions must be an array.");
   if (value.length > 100) throw new Error("Snapshot position limit exceeded.");
-  const statements: D1PreparedStatement[] = [];
+  const statements: AppPreparedStatement[] = [];
   const activeTickets: string[] = [];
   for (const item of value) {
     if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Position payload is invalid.");

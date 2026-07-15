@@ -1,14 +1,14 @@
 //+------------------------------------------------------------------+
-//|                                      PropShieldConnector.mq5     |
+//|                                      FundedFenceConnector.mq5     |
 //| Read-only MT5 account data connector. It never places, changes,  |
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
-#property copyright "PropShield"
+#property copyright "FundedFence"
 #property version   "0.10"
 #property strict
-#property description "Read-only signed account-data connector for PropShield."
+#property description "Read-only signed account-data connector for FundedFence."
 
-input string ApiBaseUrl = "https://YOUR-PROPSHIELD-SITE.example";
+input string ApiBaseUrl = "https://YOUR-FUNDEDFENCE-SITE.example";
 input string PairingCode = "";
 input int    ActiveSnapshotSeconds = 2;
 input int    IdleSnapshotSeconds = 15;
@@ -17,7 +17,7 @@ input int    CurrencyExponent = 2;
 
 string CONNECTOR_VERSION = "0.1.0";
 string PROTOCOL_VERSION = "1.0";
-string BUFFER_FILE = "PropShieldConnector/pending-events.jsonl";
+string BUFFER_FILE = "FundedFenceConnector/pending-events.jsonl";
 
 string g_device_id = "";
 string g_account_id = "";
@@ -42,14 +42,14 @@ int OnInit()
   {
    if(StringLen(ApiBaseUrl)<8 || (StringFind(ApiBaseUrl,"https://")!=0 && StringFind(ApiBaseUrl,"http://localhost")!=0))
      {
-      Print("PropShield: ApiBaseUrl must use HTTPS (localhost is allowed for development). ");
+      Print("FundedFence: ApiBaseUrl must use HTTPS (localhost is allowed for development). ");
       return(INIT_PARAMETERS_INCORRECT);
      }
    if(ActiveSnapshotSeconds<1 || IdleSnapshotSeconds<2 || RequestTimeoutMs<250 || CurrencyExponent<0 || CurrencyExponent>6)
       return(INIT_PARAMETERS_INCORRECT);
 
    EventSetTimer(1);
-   Print("PropShield read-only connector started. Add the API origin to MT5 WebRequest allowed URLs.");
+   Print("FundedFence read-only connector started. Add the API origin to MT5 WebRequest allowed URLs.");
    return(INIT_SUCCEEDED);
   }
 
@@ -115,7 +115,7 @@ bool PairConnector()
    StringReplace(normalized,"-","");
    if(StringLen(normalized)!=6)
      {
-      Print("PropShield: pairing code must contain six digits.");
+      Print("FundedFence: pairing code must contain six digits.");
       g_next_pair_attempt_ms=(long)GetTickCount64()+30000;
       return(false);
      }
@@ -135,7 +135,7 @@ bool PairConnector()
       int exponent=MathMin(g_pair_failures,6);
       int delay_seconds=(int)MathMin(300,5*MathPow(2,exponent));
       g_next_pair_attempt_ms=(long)GetTickCount64()+(long)delay_seconds*1000;
-      PrintFormat("PropShield: pairing failed with HTTP %d. Retrying in %d seconds.",status,delay_seconds);
+      PrintFormat("FundedFence: pairing failed with HTTP %d. Retrying in %d seconds.",status,delay_seconds);
       return(false);
      }
 
@@ -148,7 +148,7 @@ bool PairConnector()
    if(g_device_id=="" || g_account_id=="" || g_access_token=="" || g_ingestion_endpoint=="")
      {
       ClearCredentials();
-      Print("PropShield: pairing response was incomplete.");
+      Print("FundedFence: pairing response was incomplete.");
       return(false);
      }
 
@@ -156,7 +156,7 @@ bool PairConnector()
    g_sequence=0;
    g_reconciliation_required=true;
    g_snapshot_dirty=true;
-   PrintFormat("PropShield: paired read-only connector %s to account workspace %s.",g_device_id,g_account_id);
+   PrintFormat("FundedFence: paired read-only connector %s to account workspace %s.",g_device_id,g_account_id);
    return(true);
   }
 
@@ -224,13 +224,13 @@ bool SendEnvelope(const string envelope)
    string signature=HmacSha256Hex(g_access_token,envelope);
    if(signature=="") return(false);
    string response="";
-   string extra_headers="Authorization: Bearer "+g_access_token+"\r\nX-PropShield-Signature: "+signature+"\r\n";
+   string extra_headers="Authorization: Bearer "+g_access_token+"\r\nX-FundedFence-Signature: "+signature+"\r\n";
    int status=HttpPost(g_ingestion_endpoint,envelope,extra_headers,response);
    if(status==202 || status==200) return(true);
    if(status==401 && RefreshAccessToken())
      {
       signature=HmacSha256Hex(g_access_token,envelope);
-      extra_headers="Authorization: Bearer "+g_access_token+"\r\nX-PropShield-Signature: "+signature+"\r\n";
+      extra_headers="Authorization: Bearer "+g_access_token+"\r\nX-FundedFence-Signature: "+signature+"\r\n";
       status=HttpPost(g_ingestion_endpoint,envelope,extra_headers,response);
       return(status==202 || status==200);
      }
@@ -260,7 +260,7 @@ int HttpPost(const string url,const string body,const string extra_headers,strin
    int status=WebRequest("POST",url,headers,RequestTimeoutMs,request_data,response_data,response_headers);
    if(status==-1)
      {
-      PrintFormat("PropShield: WebRequest failed (%d). Confirm the API origin is allowed in MT5 options.",GetLastError());
+      PrintFormat("FundedFence: WebRequest failed (%d). Confirm the API origin is allowed in MT5 options.",GetLastError());
       return(-1);
      }
    response_text=CharArrayToString(response_data,0,WHOLE_ARRAY,CP_UTF8);
@@ -272,7 +272,7 @@ void AppendBufferedEvent(const string envelope)
    int handle=FileOpen(BUFFER_FILE,FILE_READ|FILE_WRITE|FILE_TXT|FILE_ANSI|FILE_COMMON);
    if(handle==INVALID_HANDLE)
      {
-      PrintFormat("PropShield: unable to open offline buffer (%d).",GetLastError());
+      PrintFormat("FundedFence: unable to open offline buffer (%d).",GetLastError());
       return;
      }
    FileSeek(handle,0,SEEK_END);

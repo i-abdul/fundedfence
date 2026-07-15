@@ -16,7 +16,7 @@ export async function hashPairingCode(code: string, pepper: string): Promise<str
   const normalized = normalizePairingCode(code);
   const digest = await crypto.subtle.digest(
     "SHA-256",
-    new TextEncoder().encode(`propshield:pairing:v1:${pepper}:${normalized}`),
+    new TextEncoder().encode(`FundedFence:pairing:v1:${pepper}:${normalized}`),
   );
   return toHex(new Uint8Array(digest));
 }

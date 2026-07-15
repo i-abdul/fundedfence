@@ -1,19 +1,19 @@
-# PropShield
+# FundedFence
 
-PropShield is a read-only prop-account risk-monitoring foundation. It pairs a lightweight MT5 Expert Advisor with a responsive web application, accepts signed account events, and calculates explainable rule buffers on the server.
+FundedFence is a read-only prop-account risk-monitoring foundation. It pairs a lightweight MT5 Expert Advisor with a responsive web application, accepts signed account events, and calculates explainable rule buffers on the server.
 
-PropShield is not financial advice, a trading signal service, a copy-trading tool, or a guarantee that a user will pass a challenge. The connector must never place, modify, or close trades.
+FundedFence is not financial advice, a trading signal service, a copy-trading tool, or a guarantee that a user will pass a challenge. The connector must never place, modify, or close trades.
 
 ## Current milestone
 
 The first coherent product loop includes:
 
 - Premium marketing, dashboard, onboarding, pairing, rules, and identity screens.
-- Hosting-managed identity and server-side tenant checks.
-- D1 schema for users, accounts, versioned rules, pairing, connector state, snapshots, positions, alerts, and a hash-linked audit ledger.
+- App-owned email/password identity with Google OAuth hooks and server-side tenant checks.
+- PostgreSQL-ready schema for users, accounts, versioned rules, pairing, connector state, snapshots, positions, alerts, and a hash-linked audit ledger.
 - Single-use six-digit pairing, source throttling, short-lived device tokens, refresh tokens, signed envelopes, replay protection, sequencing, and idempotency.
 - Exact minor-unit drawdown calculations with deterministic tests.
-- A reviewable read-only `connector/PropShieldConnector.mq5` prototype with snapshots, heartbeats, trade-transaction capture, HMAC signing, retries, and ordered offline buffering.
+- A reviewable read-only `connector/FundedFenceConnector.mq5` prototype with snapshots, heartbeats, trade-transaction capture, HMAC signing, retries, and ordered offline buffering.
 - An illustrative dashboard that clearly labels all non-live values and unverified rules.
 
 ## Local development
@@ -25,7 +25,19 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. To exercise authenticated write flows, run through the Sites hosting identity layer and configure the two runtime secrets listed in `.env.example`.
+Open `http://localhost:3000`. To exercise authenticated write flows, configure the runtime secrets listed in `.env.example`.
+
+## OCI Docker deployment
+
+The OCI target is Docker Compose with the app, PostgreSQL, and Caddy reverse proxy. It defaults to host ports `8080` and `8443` so it can sit beside PTA until we decide whether port `80` is free.
+
+```text
+cp deploy/env.oci.example .env.oci
+npm run db:migrate:postgres
+docker compose --env-file .env.oci up -d --build
+```
+
+Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` after creating a Google OAuth client. SMTP is intentionally left as a later password-reset setup item.
 
 ## Verification
 

@@ -12,7 +12,7 @@ async function render(path = "/") {
   );
 }
 
-test("server-renders the finished PropShield landing page", async () => {
+test("server-renders the finished FundedFence landing page", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);

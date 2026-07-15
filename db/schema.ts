@@ -16,8 +16,10 @@ export const users = sqliteTable("users", {
   organizationId: text("organization_id").notNull().references(() => organizations.id),
   email: text("email").notNull(),
   displayName: text("display_name"),
+  passwordHash: text("password_hash"),
+  googleSubject: text("google_subject"),
   ...timestamps,
-}, (table) => [uniqueIndex("users_email_unique").on(table.email), index("users_org_idx").on(table.organizationId)]);
+}, (table) => [uniqueIndex("users_email_unique").on(table.email), uniqueIndex("users_google_subject_unique").on(table.googleSubject), index("users_org_idx").on(table.organizationId)]);
 
 export const propFirms = sqliteTable("prop_firms", {
   id: text("id").primaryKey(),

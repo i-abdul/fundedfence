@@ -1,5 +1,5 @@
 {
-  "name": "propshield",
+  "name": "fundedfence",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -13,11 +13,13 @@
     "test:integration": "node --test tests/rendered-html.test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:postgres": "node scripts/migrate-postgres.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
     "next": "16.2.6",
+    "pg": "^8.22.0",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
@@ -25,6 +27,7 @@
     "@cloudflare/vite-plugin": "1.37.1",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
+    "@types/pg": "^8.20.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",

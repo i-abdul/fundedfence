@@ -1,6 +1,6 @@
 # Design system
 
-PropShield is dark-first, calm, and risk-focused. It uses deep green-black surfaces, restrained mint for healthy states, amber for caution, and red only for breach/danger. Panels use subtle borders rather than heavy shadows; typography carries the hierarchy.
+FundedFence is dark-first, calm, and risk-focused. It uses deep green-black surfaces, restrained mint for healthy states, amber for caution, and red only for breach/danger. Panels use subtle borders rather than heavy shadows; typography carries the hierarchy.
 
 ## Tokens
 

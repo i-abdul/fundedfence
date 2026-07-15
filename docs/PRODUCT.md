@@ -2,7 +2,7 @@
 
 ## Product promise
 
-PropShield helps prop traders understand the rules attached to an account, see risk buffers using fresh MT5 data, and avoid accidental breaches. It does not tell a user what to trade and does not imply that monitoring can guarantee a pass or payout.
+FundedFence helps prop traders understand the rules attached to an account, see risk buffers using fresh MT5 data, and avoid accidental breaches. It does not tell a user what to trade and does not imply that monitoring can guarantee a pass or payout.
 
 ## Primary journey
 

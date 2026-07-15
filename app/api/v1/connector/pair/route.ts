@@ -1,6 +1,7 @@
 import { issueDeviceToken } from "@/lib/domain/connector-protocol";
 import { hashPairingCode, normalizePairingCode } from "@/lib/domain/pairing";
 import { sha256Hex } from "@/lib/server/crypto";
+import type { AppDatabase } from "@/lib/server/database";
 import { jsonError, safeJson } from "@/lib/server/http";
 import { requireDatabase, requireSecret } from "@/lib/server/runtime";
 
@@ -79,7 +80,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 }
 
-async function enforceRateLimit(database: D1Database, request: Request, pepper: string): Promise<void> {
+async function enforceRateLimit(database: AppDatabase, request: Request, pepper: string): Promise<void> {
   const source = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const keyHash = await sha256Hex(`pair-rate:${pepper}:${source}`);
   const now = Date.now();

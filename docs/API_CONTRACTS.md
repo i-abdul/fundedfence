@@ -16,7 +16,7 @@ Requires a bearer refresh token. Verifies token type, expiry, device/account sco
 
 ## `POST /connector/events`
 
-Requires bearer access token and `X-PropShield-Signature`, an HMAC-SHA256 hex digest over the canonical JSON body using the access token as key.
+Requires bearer access token and `X-FundedFence-Signature`, an HMAC-SHA256 hex digest over the canonical JSON body using the access token as key.
 
 Envelope v1:
 
