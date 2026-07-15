@@ -350,6 +350,11 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .manual-note span { color: #756f5e; font-size: 8px; line-height: 1.5; }
 .pairing-panel { display: flex; flex-direction: column; gap: 12px; }
 .pairing-code-card, .diagnostic-card { background: linear-gradient(145deg,#0f1e17,#0b1712); border: 1px solid var(--line); border-radius: 16px; padding: 21px; }
+.selected-account-card { background: rgba(154,230,189,.045); border: 1px solid rgba(154,230,189,.12); border-radius: 12px; display: grid; gap: 5px; margin-bottom: 16px; padding: 13px; }
+.selected-account-card small { color: #63736b; font-size: 7px; letter-spacing: .12em; }
+.selected-account-card strong { font-size: 12px; }
+.selected-account-card span { color: #879790; font-size: 9px; }
+.selected-account-card em { color: #d0b879; font-size: 8px; font-style: normal; line-height: 1.4; }
 .pairing-code-header { align-items: flex-start; display: flex; justify-content: space-between; }
 .pairing-code-header small, .pairing-code-header strong { display: block; }
 .pairing-code-header small { color: #63736b; font-size: 7px; letter-spacing: .12em; }

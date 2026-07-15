@@ -17,6 +17,10 @@ export async function POST(request: Request): Promise<Response> {
     const currency = requiredCurrency(body.currency);
     const firmLabel = requiredText(body.firmLabel, "firmLabel", 80);
     const programLabel = requiredText(body.programLabel, "programLabel", 100);
+    const firmId = optionalText(body.firmId, 80);
+    const programId = optionalText(body.programId, 100);
+    const phase = optionalText(body.phase, 40);
+    const platform = optionalText(body.platform, 20) ?? "mt5";
 
     const database = await requireDatabase();
     const pepper = await requireSecret("PAIRING_PEPPER");
@@ -40,7 +44,7 @@ export async function POST(request: Request): Promise<Response> {
       database.prepare("INSERT INTO pairing_codes (id, trading_account_id, owner_user_id, code_hash, expires_at, used_at, attempts_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, 5, ?, ?)")
         .bind(pairingId, accountId, userId, codeHash, expiresAt, nowIso, nowIso),
       database.prepare("INSERT INTO audit_events (id, organization_id, trading_account_id, actor_type, actor_id, event_type, occurred_at, correlation_id, payload_json, previous_hash, event_hash) VALUES (?, ?, ?, 'user', ?, 'pairing.code_created', ?, ?, ?, NULL, ?)")
-        .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, organizationId, accountId, userId, nowIso, correlationId, JSON.stringify({ expiresAt, firmLabel, programLabel }), codeHash),
+        .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, organizationId, accountId, userId, nowIso, correlationId, JSON.stringify({ expiresAt, firmId, firmLabel, programId, programLabel, phase, platform }), codeHash),
     ]);
 
     return Response.json({ pairingCode: code, expiresAt, accountId, singleUse: true }, { status: 201 });
@@ -51,6 +55,12 @@ export async function POST(request: Request): Promise<Response> {
 
 function requiredText(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== "string" || !value.trim() || value.length > maxLength) throw new Error(`${field} is invalid.`);
+  return value.trim();
+}
+
+function optionalText(value: unknown, maxLength: number): string | undefined {
+  if (value == null || value === "") return undefined;
+  if (typeof value !== "string" || value.length > maxLength) throw new Error("Optional account metadata is invalid.");
   return value.trim();
 }
 

@@ -36,6 +36,24 @@ test("protects authenticated product pages", async () => {
   assert.match(rulesResponse.headers.get("location") ?? "", /\/login\?return_to=%2Frules/);
 });
 
+test("renders FundedNext account setup options", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-fundednext-setup`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/pairing?firm=fundednext&program=fundednext-stellar-challenge&phase=Phase%201&size=10000000", {
+      headers: { accept: "text/html", cookie: await testSessionCookie() },
+    }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /FundedNext/);
+  assert.match(html, /Stellar Challenge/);
+  assert.match(html, /\$100,000 USD/);
+});
+
 test("denies account data and pairing-code creation without browser identity", async () => {
   const accountResponse = await render("/api/v1/accounts/acct_1234567890abcdef1234567890abcdef/live");
   assert.equal(accountResponse.status, 401);
@@ -56,3 +74,15 @@ test("denies account data and pairing-code creation without browser identity", a
   assert.equal(pairingResponse.status, 401);
   assert.match(await pairingResponse.text(), /authentication_required/);
 });
+
+async function testSessionCookie() {
+  const payload = Buffer.from(JSON.stringify({
+    email: "test@example.com",
+    displayName: "Test User",
+    expiresAt: Date.now() + 60000,
+  })).toString("base64url");
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("test-session-secret-12345678901234567890"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = Buffer.from(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)))).toString("base64url");
+  process.env.APP_SESSION_SECRET = "test-session-secret-12345678901234567890";
+  return `fundedfence_session=${payload}.${signature}`;
+}
