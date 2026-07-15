@@ -138,7 +138,9 @@ export function accountContextFromSearch(searchParams: Record<string, string | s
   const program = firm.programs.find((candidate) => candidate.id === programId) ?? firm.programs[0];
   const phase = program.phases.includes(single(searchParams.phase) ?? "") ? single(searchParams.phase)! : program.phases[0];
   const requestedSize = single(searchParams.size);
-  const accountSize = program.accountSizes.find((size) => size.valueMinor === requestedSize) ?? program.accountSizes[0];
+  const accountSize = program.accountSizes.find((size) => size.valueMinor === requestedSize)
+    ?? program.accountSizes.find((size) => size.valueMinor === defaults.accountSizeMinor)
+    ?? program.accountSizes[0];
   return {
     firmId: firm.id,
     firmLabel: firm.label,

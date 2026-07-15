@@ -12,14 +12,16 @@ type PairingPageProps = {
 
 export default async function PairingPage({ searchParams }: PairingPageProps) {
   const user = await getAppUser();
-  const accountContext = accountContextFromSearch(await searchParams);
+  const params = await searchParams;
+  const accountContext = accountContextFromSearch(params);
+  const returnTo = pairingReturnPath(accountContext);
   return (
     <main className="setup-page pairing-page">
       <header className="setup-header">
         <Brand />
         <span>MT5 connector</span>
         <div className="setup-header-actions">
-          <Link href={user ? "/dashboard" : appSignInPath("/pairing")}>{user ? "Exit setup" : "Sign in"}</Link>
+          <Link href={user ? "/dashboard" : appSignInPath(returnTo)}>{user ? "Exit setup" : "Sign in"}</Link>
           {user && (
             <form action="/api/auth/logout" method="post">
               <button className="signout-button" type="submit">Sign out</button>
@@ -40,8 +42,19 @@ export default async function PairingPage({ searchParams }: PairingPageProps) {
           </ol>
           <div className="manual-note"><strong>Manual installation only in this milestone.</strong><span>The signed Windows installer, terminal auto-detection, and automatic updates are tracked for the next connector loop.</span></div>
         </section>
-        <PairingPanel authenticated={Boolean(user)} signInPath={appSignInPath("/pairing")} accountContext={accountContext} />
+        <PairingPanel authenticated={Boolean(user)} signInPath={appSignInPath(returnTo)} accountContext={accountContext} />
       </div>
     </main>
   );
+}
+
+function pairingReturnPath(accountContext: ReturnType<typeof accountContextFromSearch>): string {
+  const params = new URLSearchParams({
+    firm: accountContext.firmId,
+    program: accountContext.programId,
+    phase: accountContext.phase,
+    size: accountContext.accountSizeMinor,
+    platform: accountContext.platform,
+  });
+  return `/pairing?${params.toString()}`;
 }
