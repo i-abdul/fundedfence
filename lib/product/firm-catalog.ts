@@ -19,9 +19,11 @@ export type FirmOption = {
   programs: ProgramOption[];
 };
 
-const standardCfdSizes: AccountSizeOption[] = [
+const visibleCfdPricingSizesPendingVerification: AccountSizeOption[] = [
   { label: "$5,000 USD", valueMinor: "500000" },
+  { label: "$6,000 USD", valueMinor: "600000" },
   { label: "$10,000 USD", valueMinor: "1000000" },
+  { label: "$15,000 USD", valueMinor: "1500000" },
   { label: "$25,000 USD", valueMinor: "2500000" },
   { label: "$50,000 USD", valueMinor: "5000000" },
   { label: "$100,000 USD", valueMinor: "10000000" },
@@ -35,11 +37,27 @@ export const firmCatalog: FirmOption[] = [
     sourceUrl: "https://fundednext.com/",
     programs: [
       {
-        id: "fundednext-stellar-challenge",
-        label: "Stellar Challenge",
+        id: "fundednext-stellar-2-step",
+        label: "Stellar 2-Step",
         market: "CFDs",
         phases: ["Phase 1", "Phase 2", "Funded"],
-        accountSizes: standardCfdSizes,
+        accountSizes: visibleCfdPricingSizesPendingVerification,
+        ruleStatus: "needs-verification",
+      },
+      {
+        id: "fundednext-stellar-1-step",
+        label: "Stellar 1-Step",
+        market: "CFDs",
+        phases: ["Phase 1", "Funded"],
+        accountSizes: visibleCfdPricingSizesPendingVerification,
+        ruleStatus: "needs-verification",
+      },
+      {
+        id: "fundednext-stellar-lite",
+        label: "Stellar Lite",
+        market: "CFDs",
+        phases: ["Phase 1", "Phase 2", "Funded"],
+        accountSizes: visibleCfdPricingSizesPendingVerification,
         ruleStatus: "needs-verification",
       },
       {
@@ -47,44 +65,7 @@ export const firmCatalog: FirmOption[] = [
         label: "Stellar Instant",
         market: "CFDs",
         phases: ["Instant funded"],
-        accountSizes: standardCfdSizes,
-        ruleStatus: "needs-verification",
-      },
-      {
-        id: "fundednext-bolt",
-        label: "Bolt Challenge",
-        market: "Futures",
-        phases: ["Evaluation", "Funded"],
-        accountSizes: [
-          { label: "$25,000 USD", valueMinor: "2500000" },
-          { label: "$50,000 USD", valueMinor: "5000000" },
-          { label: "$100,000 USD", valueMinor: "10000000" },
-          { label: "$150,000 USD", valueMinor: "15000000" },
-        ],
-        ruleStatus: "needs-verification",
-      },
-      {
-        id: "fundednext-legacy",
-        label: "Legacy Challenge",
-        market: "Futures",
-        phases: ["Evaluation", "Funded"],
-        accountSizes: [
-          { label: "$25,000 USD", valueMinor: "2500000" },
-          { label: "$50,000 USD", valueMinor: "5000000" },
-          { label: "$100,000 USD", valueMinor: "10000000" },
-        ],
-        ruleStatus: "needs-verification",
-      },
-      {
-        id: "fundednext-rapid",
-        label: "Rapid Challenge",
-        market: "Futures",
-        phases: ["Evaluation", "Funded"],
-        accountSizes: [
-          { label: "$25,000 USD", valueMinor: "2500000" },
-          { label: "$50,000 USD", valueMinor: "5000000" },
-          { label: "$100,000 USD", valueMinor: "10000000" },
-        ],
+        accountSizes: visibleCfdPricingSizesPendingVerification,
         ruleStatus: "needs-verification",
       },
     ],

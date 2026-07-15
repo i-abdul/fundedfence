@@ -38,7 +38,7 @@ export default async function OnboardingPage() {
           <div className="setup-progress"><span>Step 1 of 4</span><div><i /><i /><i /><i /></div></div>
           <p className="eyebrow">Account context</p>
           <h1>Tell us what you are protecting.</h1>
-          <p className="setup-lead">Select your FundedNext trial/account context. Monitoring remains paused until the selected rule model is verified against your actual FundedNext dashboard.</p>
+          <p className="setup-lead">Select your FundedNext CFD trial/account context. Monitoring remains paused until the selected rule model and pricing size are verified against your actual FundedNext dashboard.</p>
           <form action="/pairing" method="get" className="setup-form">
             <label>
               <span>Prop firm</span>
@@ -50,7 +50,7 @@ export default async function OnboardingPage() {
             <div className="form-grid">
               <label>
                 <span>Program</span>
-                <select name="program" defaultValue="fundednext-stellar-challenge">
+                <select name="program" defaultValue="fundednext-stellar-2-step">
                   {allPrograms.map((program) => <option value={program.id} key={program.id}>{program.firmLabel} · {program.label} · {program.market}</option>)}
                 </select>
               </label>
@@ -59,7 +59,6 @@ export default async function OnboardingPage() {
                 <select name="phase" defaultValue="Phase 1">
                   <option value="Phase 1">Phase 1</option>
                   <option value="Phase 2">Phase 2</option>
-                  <option value="Evaluation">Evaluation</option>
                   <option value="Instant funded">Instant funded</option>
                   <option value="Funded">Funded</option>
                 </select>
@@ -70,7 +69,9 @@ export default async function OnboardingPage() {
                 <span>Account size</span>
                 <select name="size" defaultValue="10000000">
                   <option value="500000">$5,000 USD</option>
+                  <option value="600000">$6,000 USD</option>
                   <option value="1000000">$10,000 USD</option>
+                  <option value="1500000">$15,000 USD</option>
                   <option value="2500000">$25,000 USD</option>
                   <option value="5000000">$50,000 USD</option>
                   <option value="10000000">$100,000 USD</option>

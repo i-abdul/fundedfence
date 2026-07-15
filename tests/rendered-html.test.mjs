@@ -41,7 +41,7 @@ test("renders FundedNext account setup options", async () => {
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-fundednext-setup`);
   const { default: worker } = await import(workerUrl.href);
   const response = await worker.fetch(
-    new Request("http://localhost/pairing?firm=fundednext&program=fundednext-stellar-challenge&phase=Phase%201&size=10000000", {
+    new Request("http://localhost/pairing?firm=fundednext&program=fundednext-stellar-2-step&phase=Phase%201&size=10000000", {
       headers: { accept: "text/html", cookie: await testSessionCookie() },
     }),
     { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
@@ -50,10 +50,10 @@ test("renders FundedNext account setup options", async () => {
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /FundedNext/);
-  assert.match(html, /Stellar Challenge/);
+  assert.match(html, /Stellar 2-Step/);
   assert.match(html, /\$100,000 USD/);
 
-  const signedOutResponse = await render("/pairing?firm=fundednext&program=fundednext-stellar-challenge&phase=Phase%201&size=10000000");
+  const signedOutResponse = await render("/pairing?firm=fundednext&program=fundednext-stellar-2-step&phase=Phase%201&size=10000000");
   assert.equal(signedOutResponse.status, 200);
   assert.match(await signedOutResponse.text(), /return_to=%2Fpairing%3Ffirm%3Dfundednext/);
 });
