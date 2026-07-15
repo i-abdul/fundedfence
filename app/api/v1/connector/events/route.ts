@@ -105,7 +105,9 @@ function parseSnapshotAccount(value: unknown): SnapshotAccount {
   const record = value as Record<string, unknown>;
   const monetaryFields = ["balanceMinor", "equityMinor", "marginMinor", "freeMarginMinor", "floatingPnlMinor"] as const;
   for (const field of monetaryFields) if (!isCanonicalMinorUnits(record[field])) throw new Error(`Snapshot ${field} must be integer minor units.`);
-  if (typeof record.serverTime !== "string" || !/^\d{10,13}$/.test(record.serverTime)) throw new Error("Snapshot serverTime must be Unix time as an integer string.");
+  if (typeof record.serverTime !== "string" || !record.serverTime.trim() || record.serverTime.length > 40) {
+    throw new Error("Snapshot serverTime is invalid.");
+  }
   return record as SnapshotAccount;
 }
 
