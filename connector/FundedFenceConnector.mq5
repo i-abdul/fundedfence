@@ -4,7 +4,7 @@
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
 #property copyright "FundedFence"
-#property version   "0.10"
+#property version   "0.100"
 #property strict
 #property description "Read-only signed account-data connector for FundedFence."
 
@@ -125,7 +125,7 @@ bool PairConnector()
    string body="{\"pairingCode\":\""+EscapeJson(normalized)+"\","
                "\"hashedLogin\":\""+hashed_login+"\","
                "\"serverIdentity\":\""+EscapeJson(AccountInfoString(ACCOUNT_SERVER))+"\","
-               "\"platformVersion\":\""+EscapeJson(TerminalInfoString(TERMINAL_BUILD))+"\","
+               "\"platformVersion\":\""+EscapeJson((string)TerminalInfoInteger(TERMINAL_BUILD))+"\","
                "\"connectorVersion\":\""+CONNECTOR_VERSION+"\"}";
    string response="";
    int status=HttpPost(ApiBaseUrl+"/api/v1/connector/pair",body,"",response);
@@ -282,14 +282,14 @@ void AppendBufferedEvent(const string envelope)
 
 void FlushBufferedEvents()
   {
-   int input=FileOpen(BUFFER_FILE,FILE_READ|FILE_TXT|FILE_ANSI|FILE_COMMON);
-   if(input==INVALID_HANDLE) return;
+   int input_handle=FileOpen(BUFFER_FILE,FILE_READ|FILE_TXT|FILE_ANSI|FILE_COMMON);
+   if(input_handle==INVALID_HANDLE) return;
    string remaining[];
    int remaining_count=0;
    bool blocked=false;
-   while(!FileIsEnding(input))
+   while(!FileIsEnding(input_handle))
      {
-      string envelope=FileReadString(input);
+      string envelope=FileReadString(input_handle);
       if(envelope=="") continue;
       if(blocked || !SendEnvelope(envelope))
         {
@@ -298,7 +298,7 @@ void FlushBufferedEvents()
          remaining[remaining_count++]=envelope;
         }
      }
-   FileClose(input);
+   FileClose(input_handle);
    FileDelete(BUFFER_FILE,FILE_COMMON);
    if(remaining_count>0)
      {
