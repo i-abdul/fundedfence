@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { Brand } from "@/components/Brand";
+import { requireAppUser } from "@/lib/server/auth";
 
-export default function OnboardingPage() {
+export const dynamic = "force-dynamic";
+
+export default async function OnboardingPage() {
+  await requireAppUser("/onboarding");
   return (
     <main className="setup-page">
       <header className="setup-header"><Brand /><span>Secure account setup</span><Link href="/dashboard">Exit setup</Link></header>

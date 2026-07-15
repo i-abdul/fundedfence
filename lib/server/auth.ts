@@ -63,7 +63,7 @@ export async function setSession(user: AppUser): Promise<void> {
   cookieStore.set(SESSION_COOKIE, await signSession(user), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: usesHttpsBaseUrl(),
     maxAge: SESSION_MAX_AGE_SECONDS,
     path: "/",
   });
@@ -158,4 +158,8 @@ function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
   let result = 0;
   for (let i = 0; i < a.length; i += 1) result |= a[i] ^ b[i];
   return result === 0;
+}
+
+function usesHttpsBaseUrl(): boolean {
+  return (process.env.APP_BASE_URL ?? "").startsWith("https://");
 }

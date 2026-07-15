@@ -6,7 +6,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!clientId) return Response.redirect(new URL("/login?error=Google%20sign-in%20is%20not%20configured%20yet.", baseUrl), 303);
   const state = crypto.randomUUID();
   const cookieStore = await cookies();
-  cookieStore.set("fundedfence_google_state", state, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 600, path: "/" });
+  cookieStore.set("fundedfence_google_state", state, { httpOnly: true, sameSite: "lax", secure: baseUrl.startsWith("https://"), maxAge: 600, path: "/" });
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: `${baseUrl}/api/auth/google/callback`,
