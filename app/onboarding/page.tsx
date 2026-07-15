@@ -2,12 +2,9 @@ import Link from "next/link";
 import { Brand } from "@/components/Brand";
 import { firmCatalog } from "@/lib/product/firm-catalog";
 import { requireAppUser } from "@/lib/server/auth";
+import { AccountSetupForm } from "./AccountSetupForm";
 
 export const dynamic = "force-dynamic";
-
-const allPrograms = firmCatalog.flatMap((firm) =>
-  firm.programs.map((program) => ({ ...program, firmLabel: firm.label })),
-);
 
 export default async function OnboardingPage() {
   await requireAppUser("/onboarding");
@@ -39,51 +36,7 @@ export default async function OnboardingPage() {
           <p className="eyebrow">Account context</p>
           <h1>Tell us what you are protecting.</h1>
           <p className="setup-lead">Select your FundedNext CFD trial/account context. Monitoring remains paused until the selected rule model and pricing size are verified against your actual FundedNext dashboard.</p>
-          <form action="/pairing" method="get" className="setup-form">
-            <label>
-              <span>Prop firm</span>
-              <select name="firm" defaultValue="fundednext">
-                {firmCatalog.map((firm) => <option value={firm.id} key={firm.id}>{firm.label}</option>)}
-              </select>
-              <small>FundedNext is available now. More firms can be added through the same catalog.</small>
-            </label>
-            <div className="form-grid">
-              <label>
-                <span>Program</span>
-                <select name="program" defaultValue="fundednext-stellar-2-step">
-                  {allPrograms.map((program) => <option value={program.id} key={program.id}>{program.firmLabel} · {program.label} · {program.market}</option>)}
-                </select>
-              </label>
-              <label>
-                <span>Phase</span>
-                <select name="phase" defaultValue="Phase 1">
-                  <option value="Phase 1">Phase 1</option>
-                  <option value="Phase 2">Phase 2</option>
-                  <option value="Instant funded">Instant funded</option>
-                  <option value="Funded">Funded</option>
-                </select>
-              </label>
-            </div>
-            <div className="form-grid">
-              <label>
-                <span>Account size</span>
-                <select name="size" defaultValue="10000000">
-                  <option value="500000">$5,000 USD</option>
-                  <option value="600000">$6,000 USD</option>
-                  <option value="1000000">$10,000 USD</option>
-                  <option value="1500000">$15,000 USD</option>
-                  <option value="2500000">$25,000 USD</option>
-                  <option value="5000000">$50,000 USD</option>
-                  <option value="10000000">$100,000 USD</option>
-                  <option value="15000000">$150,000 USD</option>
-                  <option value="20000000">$200,000 USD</option>
-                </select>
-              </label>
-              <label><span>Platform</span><select name="platform" defaultValue="mt5"><option value="mt5">MetaTrader 5</option></select></label>
-            </div>
-            <label className="check-row"><input type="checkbox" required /><span><strong>I understand this rule model is not verified yet.</strong><small>FundedFence will not activate protection for a real account until we verify the official FundedNext rules and account parameters.</small></span></label>
-            <div className="form-actions"><Link className="button button-secondary" href="/dashboard">Back to preview</Link><button className="button button-primary" type="submit">Continue to connector <span>→</span></button></div>
-          </form>
+          <AccountSetupForm firms={firmCatalog} />
         </section>
       </div>
     </main>

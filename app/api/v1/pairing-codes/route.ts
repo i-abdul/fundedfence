@@ -21,6 +21,7 @@ export async function POST(request: Request): Promise<Response> {
     const programId = optionalText(body.programId, 100);
     const phase = optionalText(body.phase, 40);
     const platform = optionalText(body.platform, 20) ?? "mt5";
+    const accountPrice = optionalText(body.accountPrice, 40);
 
     const database = await requireDatabase();
     const pepper = await requireSecret("PAIRING_PEPPER");
@@ -44,7 +45,7 @@ export async function POST(request: Request): Promise<Response> {
       database.prepare("INSERT INTO pairing_codes (id, trading_account_id, owner_user_id, code_hash, expires_at, used_at, attempts_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, 5, ?, ?)")
         .bind(pairingId, accountId, userId, codeHash, expiresAt, nowIso, nowIso),
       database.prepare("INSERT INTO audit_events (id, organization_id, trading_account_id, actor_type, actor_id, event_type, occurred_at, correlation_id, payload_json, previous_hash, event_hash) VALUES (?, ?, ?, 'user', ?, 'pairing.code_created', ?, ?, ?, NULL, ?)")
-        .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, organizationId, accountId, userId, nowIso, correlationId, JSON.stringify({ expiresAt, firmId, firmLabel, programId, programLabel, phase, platform }), codeHash),
+        .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, organizationId, accountId, userId, nowIso, correlationId, JSON.stringify({ expiresAt, firmId, firmLabel, programId, programLabel, phase, platform, accountPrice }), codeHash),
     ]);
 
     return Response.json({ pairingCode: code, expiresAt, accountId, singleUse: true }, { status: 201 });

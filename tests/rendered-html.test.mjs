@@ -52,10 +52,18 @@ test("renders FundedNext account setup options", async () => {
   assert.match(html, /FundedNext/);
   assert.match(html, /Stellar 2-Step/);
   assert.match(html, /\$100,000 USD/);
+  assert.match(html, /\$549\.99/);
 
   const signedOutResponse = await render("/pairing?firm=fundednext&program=fundednext-stellar-2-step&phase=Phase%201&size=10000000");
   assert.equal(signedOutResponse.status, 200);
   assert.match(await signedOutResponse.text(), /return_to=%2Fpairing%3Ffirm%3Dfundednext/);
+
+  const instantResponse = await render("/pairing?firm=fundednext&program=fundednext-stellar-instant&phase=Instant%20funded&size=2000000");
+  assert.equal(instantResponse.status, 200);
+  const instantHtml = await instantResponse.text();
+  assert.match(instantHtml, /Stellar Instant/);
+  assert.match(instantHtml, /\$20,000 USD/);
+  assert.match(instantHtml, /\$449\.99/);
 });
 
 test("denies account data and pairing-code creation without browser identity", async () => {

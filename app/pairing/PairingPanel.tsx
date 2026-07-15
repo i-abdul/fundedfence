@@ -20,6 +20,7 @@ export function PairingPanel({ authenticated, signInPath, accountContext }: { au
         body: JSON.stringify({
           accountLabel: `${accountContext.accountSizeLabel} ${accountContext.phase}`,
           accountSizeMinor: accountContext.accountSizeMinor,
+          accountPrice: accountContext.accountPrice,
           currency: accountContext.currency,
           firmId: accountContext.firmId,
           firmLabel: accountContext.firmLabel,
@@ -45,7 +46,7 @@ export function PairingPanel({ authenticated, signInPath, accountContext }: { au
         <div className="selected-account-card">
           <small>SELECTED ACCOUNT</small>
           <strong>{accountContext.firmLabel} · {accountContext.programLabel}</strong>
-          <span>{accountContext.accountSizeLabel} · {accountContext.phase} · MT5</span>
+          <span>{accountContext.accountSizeLabel}{accountContext.accountPrice ? ` · ${accountContext.accountPrice}` : ""} · {accountContext.phase} · MT5</span>
           {accountContext.ruleStatus === "needs-verification" && <em>Rules need verification from your FundedNext account before protection is active.</em>}
         </div>
         <div className="pairing-code-header"><span><small>SINGLE-USE PAIRING CODE</small><strong>{result ? "Ready for MT5" : "Sign in to generate"}</strong></span><em>{result ? "10 MIN" : "SECURE"}</em></div>
