@@ -4,7 +4,7 @@
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
 #property copyright "FundedFence"
-#property version   "0.100"
+#property version   "001.000"
 #property strict
 #property description "Read-only signed account-data connector for FundedFence."
 
