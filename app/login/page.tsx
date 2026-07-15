@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Brand } from "@/components/Brand";
+import { getAppUser } from "@/lib/server/auth";
 
 type AuthPageProps = {
   searchParams: Promise<{ error?: string; return_to?: string }>;
@@ -8,6 +10,8 @@ type AuthPageProps = {
 export default async function LoginPage({ searchParams }: AuthPageProps) {
   const params = await searchParams;
   const returnTo = safeReturnTo(params.return_to ?? "/dashboard");
+  const user = await getAppUser();
+  if (user) redirect(returnTo);
   return (
     <main className="auth-page">
       <div className="auth-brand"><Brand /></div>
