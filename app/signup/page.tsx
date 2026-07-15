@@ -28,7 +28,7 @@ export default async function SignupPage({ searchParams }: AuthPageProps) {
           <label><span>Password</span><input name="password" type="password" autoComplete="new-password" minLength={10} required /></label>
           <button className="button button-primary full" type="submit">Create workspace</button>
         </form>
-        <a className="button button-secondary full" href="/api/auth/google/start">Continue with Google</a>
+        <a className="button button-secondary full" href={`/api/auth/google/start?return_to=${encodeURIComponent(returnTo)}`}>Continue with Google</a>
         <div className="auth-divider"><span />No MT5 password collection<span /></div>
         <ul><li>Single-use connector pairing</li><li>Read-only MT5 source</li><li>Data export and deletion foundation</li></ul>
         <p className="auth-switch">Already have a workspace? <Link href={`/login?return_to=${encodeURIComponent(returnTo)}`}>Sign in</Link></p>

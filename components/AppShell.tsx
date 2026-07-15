@@ -23,13 +23,23 @@ export function AppShell({ active, children }: { active: string; children: React
           ))}
         </nav>
         <div className="sidebar-account">
-          <span className="account-avatar">AR</span>
+          <span className="account-avatar">FF</span>
           <span><strong>Account workspace</strong><small>Protected preview</small></span>
-          <span aria-hidden="true">···</span>
+          <form action="/api/auth/logout" method="post">
+            <button className="signout-button" type="submit">Sign out</button>
+          </form>
         </div>
       </aside>
       <div className="app-main">
-        <header className="mobile-header"><Brand /><Link className="quiet-link" href="/onboarding">Connect</Link></header>
+        <header className="mobile-header">
+          <Brand />
+          <div className="mobile-actions">
+            <Link className="quiet-link" href="/onboarding">Connect</Link>
+            <form action="/api/auth/logout" method="post">
+              <button className="signout-button" type="submit">Sign out</button>
+            </form>
+          </div>
+        </header>
         {children}
       </div>
       <nav className="mobile-nav" aria-label="Mobile product navigation">

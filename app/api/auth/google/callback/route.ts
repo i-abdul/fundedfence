@@ -19,6 +19,7 @@ export async function GET(request: Request): Promise<Response> {
   try {
     const cookieStore = await cookies();
     const expectedState = cookieStore.get("fundedfence_google_state")?.value;
+    const returnTo = safeReturnTo(cookieStore.get("fundedfence_google_return_to")?.value ?? "/dashboard");
     if (!expectedState || url.searchParams.get("state") !== expectedState) throw new Error("Google sign-in state did not match.");
     const code = url.searchParams.get("code");
     if (!code) throw new Error("Google did not return an authorization code.");
@@ -29,7 +30,8 @@ export async function GET(request: Request): Promise<Response> {
     const user = await createOrUpdateUser(profile.email, profile.name ?? profile.email, undefined, profile.sub);
     await setSession(user);
     cookieStore.delete("fundedfence_google_state");
-    return Response.redirect(new URL("/dashboard", baseUrl), 303);
+    cookieStore.delete("fundedfence_google_return_to");
+    return Response.redirect(new URL(returnTo, baseUrl), 303);
   } catch (error) {
     return Response.redirect(new URL(`/login?error=${encodeURIComponent(error instanceof Error ? error.message : "Google sign-in failed.")}`, baseUrl), 303);
   }
@@ -62,4 +64,8 @@ function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is not configured.`);
   return value;
+}
+
+function safeReturnTo(value: string): string {
+  return value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
 }

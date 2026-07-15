@@ -27,7 +27,7 @@ export default async function LoginPage({ searchParams }: AuthPageProps) {
           <label><span>Password</span><input name="password" type="password" autoComplete="current-password" required /></label>
           <button className="button button-primary full" type="submit">Sign in</button>
         </form>
-        <a className="button button-secondary full" href="/api/auth/google/start">Continue with Google</a>
+        <a className="button button-secondary full" href={`/api/auth/google/start?return_to=${encodeURIComponent(returnTo)}`}>Continue with Google</a>
         <div className="auth-divider"><span />App-owned sessions<span /></div>
         <ul><li>Server-side identity checks</li><li>Tenant-scoped account access</li><li>Revocable connector credentials</li></ul>
         <p className="auth-switch">New to FundedFence? <Link href={`/signup?return_to=${encodeURIComponent(returnTo)}`}>Create your workspace</Link></p>

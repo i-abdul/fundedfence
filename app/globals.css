@@ -159,7 +159,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .sidebar-account strong, .sidebar-account small { display: block; }
 .sidebar-account strong { font-size: 10px; font-weight: 580; }
 .sidebar-account small { color: #66766e; font-size: 8px; margin-top: 2px; }
-.sidebar-account > span:last-child { color: #607068; }
+.sidebar-account form, .mobile-actions form { margin: 0; }
+.signout-button { background: transparent; border: 0; color: #8fa39a; cursor: pointer; font: inherit; font-size: 8px; padding: 6px 0; text-align: right; white-space: nowrap; }
+.signout-button:hover, .signout-button:focus-visible { color: var(--mint); }
+.mobile-actions { align-items: center; display: flex; gap: 12px; }
 .app-main { min-width: 0; }
 .mobile-header, .mobile-nav { display: none; }
 .dashboard-shell { margin: auto; max-width: 1500px; padding: 21px 30px 40px; }

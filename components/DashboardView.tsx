@@ -20,7 +20,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
       </div>
 
       <section className="account-strip" aria-label="Selected account">
-        <div className="account-identity"><span className="mini-shield">PS</span><span><strong>{demoAccount.label}</strong><small>{demoAccount.firm} · MT5</small></span></div>
+        <div className="account-identity"><span className="mini-shield">FF</span><span><strong>{demoAccount.label}</strong><small>{demoAccount.firm} · MT5</small></span></div>
         <span className="phase-pill">{demoAccount.phase}</span>
         <div className="live-state"><span /> Live preview <small>{demoAccount.lastHeartbeat}</small></div>
       </section>
@@ -81,7 +81,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
           <div className="panel-footer"><span>Projected equity at all stops: <strong>$100,202</strong></span><span>Remaining buffer: <strong>$1,962</strong></span></div>
         </article>
 
-        <article className="panel daily-plan">
+        <article className="panel daily-plan" id="simulator">
           <div className="panel-heading"><div><p className="eyebrow">Discipline</p><h2>Today’s plan</h2></div><span className="status-pill neutral">London + NY</span></div>
           <div className="plan-budget"><small>Risk budget remaining</small><strong>$1,332</strong><span>of $2,000</span><div className="progress-track"><span style={{ width: "66%" }} /></div></div>
           <dl className="plan-list"><div><dt>Max risk / trade</dt><dd>$500</dd></div><div><dt>Trades remaining</dt><dd>2 of 4</dd></div><div><dt>Stop after loss</dt><dd>−$1,500</dd></div><div><dt>Profit lock</dt><dd>+$1,200</dd></div></dl>

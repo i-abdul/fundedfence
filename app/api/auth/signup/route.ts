@@ -1,4 +1,4 @@
-import { createOrUpdateUser, hashPassword, normalizeEmail, setSession } from "@/lib/server/auth";
+import { createOrUpdateUser, findUserByEmail, hashPassword, normalizeEmail, setSession } from "@/lib/server/auth";
 
 export async function POST(request: Request): Promise<Response> {
   const form = await request.formData();
@@ -7,6 +7,9 @@ export async function POST(request: Request): Promise<Response> {
     const email = normalizeEmail(String(form.get("email") ?? ""));
     const displayName = String(form.get("displayName") ?? "").trim() || email;
     const password = String(form.get("password") ?? "");
+    if (await findUserByEmail(email)) {
+      throw new Error("An account with this email already exists. Sign in instead.");
+    }
     const user = await createOrUpdateUser(email, displayName, await hashPassword(password));
     await setSession(user);
     return redirectResponse(form, origin, "/onboarding");

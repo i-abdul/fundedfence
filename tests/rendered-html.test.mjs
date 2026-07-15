@@ -26,16 +26,14 @@ test("server-renders the finished FundedFence landing page", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
-test("server-renders the product dashboard with explicit data provenance", async () => {
+test("protects authenticated product pages", async () => {
   const response = await render("/dashboard");
-  assert.equal(response.status, 200);
-  const html = await response.text();
-  assert.match(html, /Account overview/);
-  assert.match(html, /Illustrative account/);
-  assert.match(html, /Account health/);
-  assert.match(html, /Open positions/);
-  assert.match(html, /Rule status/);
-  assert.match(html, /read-only/i);
+  assert.equal(response.status, 307);
+  assert.match(response.headers.get("location") ?? "", /\/login\?return_to=%2Fdashboard/);
+
+  const rulesResponse = await render("/rules");
+  assert.equal(rulesResponse.status, 307);
+  assert.match(rulesResponse.headers.get("location") ?? "", /\/login\?return_to=%2Frules/);
 });
 
 test("denies account data and pairing-code creation without browser identity", async () => {
