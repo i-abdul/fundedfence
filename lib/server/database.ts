@@ -89,9 +89,11 @@ class PostgresPreparedStatement implements AppPreparedStatement {
 
 function toPostgresSql(sql: string): string {
   let index = 0;
-  return sql
-    .replace(/INSERT OR IGNORE INTO/gi, "INSERT INTO")
+  const isInsertOrIgnore = /^\s*INSERT\s+OR\s+IGNORE\s+INTO/i.test(sql);
+  const converted = sql
+    .replace(/^\s*INSERT\s+OR\s+IGNORE\s+INTO/i, "INSERT INTO")
     .replace(/\bMAX\(0,\s*attempts_remaining\s*-\s*1\)/gi, "GREATEST(0, attempts_remaining - 1)")
-    .replace(/\?/g, () => `$${++index}`)
-    .replace(/(INSERT INTO[\s\S]+?VALUES\s*\([\s\S]+?\))(?!\s*ON\s+CONFLICT)/i, "$1 ON CONFLICT DO NOTHING");
+    .replace(/\?/g, () => `$${++index}`);
+  if (isInsertOrIgnore && !/\bON\s+CONFLICT\b/i.test(converted)) return `${converted} ON CONFLICT DO NOTHING`;
+  return converted;
 }
