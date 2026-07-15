@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { issueDeviceToken, signEnvelope, validateEnvelope, verifyDeviceToken, verifyEnvelopeSignature, type ConnectorEnvelope } from "../lib/domain/connector-protocol.ts";
+import { issueDeviceToken, signEnvelope, signRawEnvelope, validateEnvelope, verifyDeviceToken, verifyEnvelopeSignature, verifyRawEnvelopeSignature, type ConnectorEnvelope } from "../lib/domain/connector-protocol.ts";
 
 const secret = "connector-secret-for-tests-only-123456";
 
@@ -33,6 +33,13 @@ test("signs the canonical envelope and detects tampering", async () => {
   const signature = await signEnvelope("device-access-token", value);
   assert.equal(await verifyEnvelopeSignature("device-access-token", value, signature), true);
   assert.equal(await verifyEnvelopeSignature("device-access-token", { ...value, sequence: 8 }, signature), false);
+});
+
+test("verifies raw connector JSON exactly as sent by MT5", async () => {
+  const rawEnvelope = `{"accountId":"acct_12345678","connectorId":"dev_12345678","eventType":"account.snapshot","idempotencyKey":"evt_12345678","occurredAt":"${new Date().toISOString()}","payload":{"account":{"balanceMinor":"10000000","equityMinor":"10000000","marginMinor":"0","freeMarginMinor":"10000000","floatingPnlMinor":"0","serverTime":"1784123456"},"positions":[],"pendingOrderCount":0},"protocolVersion":"1.0","sentAt":"${new Date().toISOString()}","sequence":1}`;
+  const signature = await signRawEnvelope("device-access-token", rawEnvelope);
+  assert.equal(await verifyRawEnvelopeSignature("device-access-token", rawEnvelope, signature), true);
+  assert.equal(await verifyRawEnvelopeSignature("device-access-token", rawEnvelope.replace('"sequence":1', '"sequence":2'), signature), false);
 });
 
 test("accepts buffered historical events while enforcing a fresh send timestamp", () => {

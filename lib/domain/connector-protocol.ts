@@ -68,6 +68,14 @@ export async function verifyEnvelopeSignature(token: string, envelope: Connector
   return constantTimeEqual(await signEnvelope(token, envelope), signature.toLowerCase());
 }
 
+export async function signRawEnvelope(token: string, rawEnvelope: string): Promise<string> {
+  return hmacHex(token, rawEnvelope);
+}
+
+export async function verifyRawEnvelopeSignature(token: string, rawEnvelope: string, signature: string): Promise<boolean> {
+  return constantTimeEqual(await signRawEnvelope(token, rawEnvelope), signature.toLowerCase());
+}
+
 export function canonicalStringify(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalStringify).join(",")}]`;

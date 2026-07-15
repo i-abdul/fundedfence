@@ -2,7 +2,7 @@ import {
   canonicalStringify,
   validateEnvelope,
   verifyDeviceToken,
-  verifyEnvelopeSignature,
+  verifyRawEnvelopeSignature,
 } from "@/lib/domain/connector-protocol";
 import { sha256Hex, stableId } from "@/lib/server/crypto";
 import type { AppDatabase, AppPreparedStatement } from "@/lib/server/database";
@@ -34,11 +34,12 @@ export async function POST(request: Request): Promise<Response> {
     const secret = await requireSecret("CONNECTOR_TOKEN_SECRET");
     const claims = await verifyDeviceToken(accessToken, secret);
     if (claims.tokenType !== "access") return jsonError(401, "invalid_token_type", "An access token is required.", correlationId);
-    const envelope = validateEnvelope(await request.json());
+    const rawEnvelope = await request.text();
+    const envelope = validateEnvelope(JSON.parse(rawEnvelope));
     if (envelope.connectorId !== claims.deviceId || envelope.accountId !== claims.accountId) {
       return jsonError(403, "connector_scope_mismatch", "The connector credential does not own this account.", correlationId);
     }
-    if (!(await verifyEnvelopeSignature(accessToken, envelope, signature))) {
+    if (!(await verifyRawEnvelopeSignature(accessToken, rawEnvelope, signature))) {
       return jsonError(401, "signature_invalid", "The connector message signature is invalid.", correlationId);
     }
 
