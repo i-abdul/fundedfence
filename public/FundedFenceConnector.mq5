@@ -18,6 +18,7 @@ input int    CurrencyExponent = 2;
 string CONNECTOR_VERSION = "0.1.0";
 string PROTOCOL_VERSION = "1.0";
 string BUFFER_FILE = "FundedFenceConnector/pending-events.jsonl";
+string CREDENTIALS_FILE = "FundedFenceConnector/credentials.tsv";
 
 string g_device_id = "";
 string g_account_id = "";
@@ -51,6 +52,8 @@ int OnInit()
       return(INIT_PARAMETERS_INCORRECT);
 
    EventSetTimer(1);
+   if(LoadCredentials())
+      PrintFormat("FundedFence: loaded saved connector credentials for account %s.",g_account_id);
    Print("FundedFence read-only connector started. Add the API origin to MT5 WebRequest allowed URLs.");
    return(INIT_SUCCEEDED);
   }
@@ -158,6 +161,7 @@ bool PairConnector()
    g_sequence=0;
    g_reconciliation_required=true;
    g_snapshot_dirty=true;
+   SaveCredentials();
    PrintFormat("FundedFence: paired read-only connector %s to account workspace %s.",g_device_id,g_account_id);
    return(true);
   }
@@ -207,6 +211,7 @@ string BuildHeartbeatPayload()
 void QueueOrSend(const string event_type,const string payload,const datetime occurred_at)
   {
    g_sequence++;
+   SaveCredentials();
    string idempotency=StringFormat("evt_%s_%I64d",g_device_id,g_sequence);
    string envelope="{\"accountId\":\""+EscapeJson(g_account_id)+"\","
                    "\"connectorId\":\""+EscapeJson(g_device_id)+"\","
@@ -248,6 +253,7 @@ bool RefreshAccessToken()
    string replacement=JsonString(response,"accessToken");
    if(replacement=="") return(false);
    g_access_token=replacement;
+   SaveCredentials();
    return(true);
   }
 
@@ -428,4 +434,55 @@ void ClearCredentials()
    g_refresh_token="";
    g_ingestion_endpoint="";
    g_refresh_endpoint="";
+   g_sequence=0;
+   FileDelete(CREDENTIALS_FILE,FILE_COMMON);
+  }
+
+bool LoadCredentials()
+  {
+   int handle=FileOpen(CREDENTIALS_FILE,FILE_READ|FILE_TXT|FILE_ANSI|FILE_COMMON);
+   if(handle==INVALID_HANDLE) return(false);
+   string device_id=FileReadString(handle);
+   string account_id=FileReadString(handle);
+   string access_token=FileReadString(handle);
+   string refresh_token=FileReadString(handle);
+   string ingestion_endpoint=FileReadString(handle);
+   string refresh_endpoint=FileReadString(handle);
+   string sequence_text=FileReadString(handle);
+   FileClose(handle);
+
+   if(device_id=="" || account_id=="" || access_token=="" || ingestion_endpoint=="")
+      return(false);
+
+   g_device_id=device_id;
+   g_account_id=account_id;
+   g_access_token=access_token;
+   g_refresh_token=refresh_token;
+   g_ingestion_endpoint=ingestion_endpoint;
+   g_refresh_endpoint=refresh_endpoint;
+   g_sequence=(long)StringToInteger(sequence_text);
+   g_reconciliation_required=true;
+   g_snapshot_dirty=true;
+   return(true);
+  }
+
+void SaveCredentials()
+  {
+   if(g_device_id=="" || g_account_id=="" || g_access_token=="" || g_ingestion_endpoint=="")
+      return;
+
+   int handle=FileOpen(CREDENTIALS_FILE,FILE_WRITE|FILE_TXT|FILE_ANSI|FILE_COMMON);
+   if(handle==INVALID_HANDLE)
+     {
+      PrintFormat("FundedFence: unable to save connector credentials (%d).",GetLastError());
+      return;
+     }
+   FileWrite(handle,g_device_id);
+   FileWrite(handle,g_account_id);
+   FileWrite(handle,g_access_token);
+   FileWrite(handle,g_refresh_token);
+   FileWrite(handle,g_ingestion_endpoint);
+   FileWrite(handle,g_refresh_endpoint);
+   FileWrite(handle,(string)g_sequence);
+   FileClose(handle);
   }
