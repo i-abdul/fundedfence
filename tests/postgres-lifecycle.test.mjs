@@ -13,7 +13,12 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   const adminPool = new Pool({ connectionString: baseConnectionString });
   await adminPool.query(`CREATE SCHEMA "${schema}"`);
   const testPool = new Pool({ connectionString: baseConnectionString, options: `-c search_path=${schema}` });
+  const isolatedConnectionUrl = new URL(baseConnectionString);
+  isolatedConnectionUrl.searchParams.set("options", `-c search_path=${schema}`);
+  const previousPostgresUrl = process.env.POSTGRES_URL;
   t.after(async () => {
+    if (previousPostgresUrl === undefined) delete process.env.POSTGRES_URL;
+    else process.env.POSTGRES_URL = previousPostgresUrl;
     await testPool.end();
     await adminPool.query(`DROP SCHEMA "${schema}" CASCADE`);
     await adminPool.end();
@@ -25,6 +30,10 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   const sessionSecret = "integration-session-secret-12345678901234567890";
   const pairingPepper = "integration-pairing-pepper-12345678901234567890";
   const connectorSecret = "integration-connector-secret-12345678901234567890";
+  process.env.POSTGRES_URL = isolatedConnectionUrl.toString();
+  process.env.APP_SESSION_SECRET = sessionSecret;
+  process.env.PAIRING_PEPPER = pairingPepper;
+  process.env.CONNECTOR_TOKEN_SECRET = connectorSecret;
   const env = {
     DB: database,
     APP_SESSION_SECRET: sessionSecret,
