@@ -64,17 +64,22 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   const paired = await pairedResponse.json();
   assert.equal(paired.accountId, replacementCode.accountId);
 
+  const refreshResponse = await api(worker, env, "/api/v1/connector/refresh", { method: "POST", headers: { authorization: `Bearer ${paired.refreshToken}` }, body: {} });
+  assert.equal(refreshResponse.status, 200);
+  const refreshedCredential = await refreshResponse.json();
+  assert.match(refreshedCredential.accessToken, /^[^.]+\.[a-f0-9]{64}$/);
+
   const reusedAttempt = await pairConnector(worker, env, replacementCode.pairingCode);
   assert.equal(reusedAttempt.status, 401);
   assert.match(await reusedAttempt.text(), /pairing_rejected/);
 
   const acceptedEnvelope = heartbeatEnvelope(paired, 1, `evt_${paired.deviceId}_1`);
-  const accepted = await sendEnvelope(worker, env, paired.accessToken, acceptedEnvelope);
+  const accepted = await sendEnvelope(worker, env, refreshedCredential.accessToken, acceptedEnvelope);
   assert.equal(accepted.status, 202);
-  const duplicate = await sendEnvelope(worker, env, paired.accessToken, acceptedEnvelope);
+  const duplicate = await sendEnvelope(worker, env, refreshedCredential.accessToken, acceptedEnvelope);
   assert.equal(duplicate.status, 200);
   assert.equal((await duplicate.json()).duplicate, true);
-  const outOfOrder = await sendEnvelope(worker, env, paired.accessToken, heartbeatEnvelope(paired, 1, `evt_${paired.deviceId}_replay`));
+  const outOfOrder = await sendEnvelope(worker, env, refreshedCredential.accessToken, heartbeatEnvelope(paired, 1, `evt_${paired.deviceId}_replay`));
   assert.equal(outOfOrder.status, 409);
   assert.match(await outOfOrder.text(), /sequence_out_of_order/);
 

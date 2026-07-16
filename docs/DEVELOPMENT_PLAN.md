@@ -26,7 +26,7 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 
 ### Remaining Sprint 1 work
 
-- [ ] Add database-backed integration tests for expiry, reuse, replacement, tenant isolation, reconnect, duplicate events, and out-of-order events.
+- [x] Add PostgreSQL-backed integration tests for expiry, concurrent reuse, replacement, tenant isolation, token refresh/revocation, reconnect, duplicate events, and out-of-order events.
 - [x] Add connector/device revocation and an explicit same-account re-pair flow.
 - [x] Capture symbol digits, tick size, loss tick value, and swap for open positions.
 - [ ] Capture commission, deals, pending-order details, and partial closes.
