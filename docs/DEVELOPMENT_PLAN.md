@@ -33,7 +33,7 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 - [x] Calculate auditable open risk at stop-loss from broker contract metadata and flag missing stops.
 - [x] Add a PostgreSQL freshness monitor that records delayed/offline transitions and creates a deduplicated connector-paused alert while the dashboard is closed.
 - [x] Add remembered account selection for users with more than one account workspace.
-- [ ] Complete an end-to-end OCI/MT5 soak test covering restart, token refresh, network interruption, and recovery.
+- [x] Complete an end-to-end OCI/MT5 soak covering app restart, token refresh, a controlled network interruption, buffered sequence recovery, and return to live state.
 
 ### Sprint 1 acceptance criteria
 
