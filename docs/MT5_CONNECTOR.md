@@ -10,7 +10,7 @@ The prototype reads account state, open positions, pending-order count, terminal
 
 The EA submits the single-use code, SHA-256 of MT5 login plus server, server identity, MT5 build, and connector version. It receives account-scoped access/refresh tokens and approved endpoints. Access tokens expire after 15 minutes and are refreshed with the revocable device identity.
 
-The current EA persists account-scoped credentials and the last sequence in the MT5 common data directory so terminal restarts can recover. Every event also carries the SHA-256 login/server identity and the backend rejects an event if the terminal account changed. Windows-protected storage remains required before a production release.
+The current EA persists account-scoped credentials and the last sequence in the MT5 common data directory so terminal restarts can recover. Every event also carries the SHA-256 login/server identity and the backend rejects an event if the terminal account changed. Because the Common directory survives terminal reinstalls, `RePairSavedConnector` explicitly clears the prior device before a deliberate re-pair. It must be returned to `false` after pairing. Windows-protected storage remains required before a production release.
 
 ## Event cadence
 

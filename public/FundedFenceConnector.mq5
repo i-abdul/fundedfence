@@ -4,18 +4,19 @@
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
 #property copyright "FundedFence"
-#property version   "001.001"
+#property version   "001.002"
 #property strict
 #property description "Read-only signed account-data connector for FundedFence."
 
 input string ApiBaseUrl = "https://YOUR-FUNDEDFENCE-SITE.example";
 input string PairingCode = "";
+input bool   RePairSavedConnector = false;
 input int    ActiveSnapshotSeconds = 2;
 input int    IdleSnapshotSeconds = 15;
 input int    RequestTimeoutMs = 1800;
 input int    CurrencyExponent = 2;
 
-string CONNECTOR_VERSION = "0.2.0";
+string CONNECTOR_VERSION = "0.2.1";
 string PROTOCOL_VERSION = "1.1";
 string BUFFER_FILE = "FundedFenceConnector/pending-events-v1-1.jsonl";
 string CREDENTIALS_FILE = "FundedFenceConnector/credentials.tsv";
@@ -41,6 +42,7 @@ int    g_pending_transaction_type = -1;
 
 int OnInit()
   {
+   PrintFormat("FundedFence connector %s (protocol %s) initializing.",CONNECTOR_VERSION,PROTOCOL_VERSION);
    if(StringLen(ApiBaseUrl)<8 || (StringFind(ApiBaseUrl,"https://")!=0 && StringFind(ApiBaseUrl,"http://localhost")!=0 && StringFind(ApiBaseUrl,"http://fundedfence.ddns.net")!=0))
      {
       Print("FundedFence: ApiBaseUrl must use HTTPS. Temporary HTTP is allowed for localhost and fundedfence.ddns.net during deployment testing.");
@@ -52,6 +54,11 @@ int OnInit()
       return(INIT_PARAMETERS_INCORRECT);
 
    EventSetTimer(1);
+   if(RePairSavedConnector)
+     {
+      ClearCredentials();
+      Print("FundedFence: saved connector credentials cleared for re-pairing. Set RePairSavedConnector to false after pairing succeeds.");
+     }
    if(LoadCredentials())
       PrintFormat("FundedFence: loaded saved connector credentials for account %s.",g_account_id);
    Print("FundedFence read-only connector started. Add the API origin to MT5 WebRequest allowed URLs.");
@@ -148,7 +155,7 @@ bool PairConnector()
       int exponent=MathMin(g_pair_failures,6);
       int delay_seconds=(int)MathMin(300,5*MathPow(2,exponent));
       g_next_pair_attempt_ms=(long)GetTickCount64()+(long)delay_seconds*1000;
-      PrintFormat("FundedFence: pairing failed with HTTP %d. Retrying in %d seconds.",status,delay_seconds);
+      PrintFormat("FundedFence: pairing failed with HTTP %d: %s. Retrying in %d seconds.",status,response,delay_seconds);
       return(false);
      }
 
@@ -248,7 +255,7 @@ bool SendEnvelope(const string envelope)
       signature=HmacSha256Hex(g_access_token,envelope);
       extra_headers="Authorization: Bearer "+g_access_token+"\r\nX-FundedFence-Signature: "+signature+"\r\n";
       status=HttpPost(g_ingestion_endpoint,envelope,extra_headers,response);
-      return(status==202 || status==200);
+      if(status==202 || status==200) return(true);
      }
    if(status==409 && StringFind(response,"terminal_identity_changed")>=0)
      {
@@ -256,6 +263,8 @@ bool SendEnvelope(const string envelope)
       ClearCredentials();
       return(true);
      }
+   if(status!=-1)
+      PrintFormat("FundedFence: event rejected with HTTP %d: %s",status,response);
    return(false);
   }
 
@@ -264,7 +273,11 @@ bool RefreshAccessToken()
    if(g_refresh_token=="" || g_refresh_endpoint=="") return(false);
    string response="";
    int status=HttpPost(g_refresh_endpoint,"{}","Authorization: Bearer "+g_refresh_token+"\r\n",response);
-   if(status!=200) return(false);
+   if(status!=200)
+     {
+      if(status!=-1) PrintFormat("FundedFence: access-token refresh failed with HTTP %d: %s",status,response);
+      return(false);
+     }
    string replacement=JsonString(response,"accessToken");
    if(replacement=="") return(false);
    g_access_token=replacement;
