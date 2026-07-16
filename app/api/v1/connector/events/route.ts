@@ -1,5 +1,6 @@
 import {
   canonicalStringify,
+  type DeviceTokenClaims,
   validateEnvelope,
   verifyDeviceToken,
   verifyRawEnvelopeSignature,
@@ -33,7 +34,12 @@ export async function POST(request: Request): Promise<Response> {
     const signature = request.headers.get("x-fundedfence-signature") ?? "";
     if (!accessToken || !signature) return jsonError(401, "connector_auth_required", "Connector authentication and signature are required.", correlationId);
     const secret = await requireSecret("CONNECTOR_TOKEN_SECRET");
-    const claims = await verifyDeviceToken(accessToken, secret);
+    let claims: DeviceTokenClaims;
+    try {
+      claims = await verifyDeviceToken(accessToken, secret);
+    } catch {
+      return jsonError(401, "connector_token_invalid", "The connector access token is expired or invalid.", correlationId);
+    }
     if (claims.tokenType !== "access") return jsonError(401, "invalid_token_type", "An access token is required.", correlationId);
     const rawEnvelope = await request.text();
     const envelope = validateEnvelope(JSON.parse(rawEnvelope));

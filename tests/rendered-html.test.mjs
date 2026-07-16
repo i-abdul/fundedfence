@@ -91,6 +91,40 @@ test("denies account data and pairing-code creation without browser identity", a
   assert.match(await pairingResponse.text(), /authentication_required/);
 });
 
+test("classifies an expired connector access token as refreshable authentication failure", async () => {
+  const connectorSecret = "test-connector-secret-12345678901234567890";
+  process.env.CONNECTOR_TOKEN_SECRET = connectorSecret;
+  const expiredToken = await testDeviceToken({
+    deviceId: "dev_12345678",
+    accountId: "acct_12345678",
+    tokenType: "access",
+    issuedAt: Date.now() - 120_000,
+    expiresAt: Date.now() - 60_000,
+    nonce: "nonce_12345678",
+  }, connectorSecret);
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-expired-connector-token`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/api/v1/connector/events", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${expiredToken}`,
+        "content-type": "application/json",
+        "x-fundedfence-signature": "00",
+      },
+      body: "{}",
+    }),
+    {
+      ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+      CONNECTOR_TOKEN_SECRET: connectorSecret,
+    },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 401);
+  assert.match(await response.text(), /connector_token_invalid/);
+});
+
 async function testSessionCookie() {
   const payload = Buffer.from(JSON.stringify({
     email: "test@example.com",
@@ -101,4 +135,11 @@ async function testSessionCookie() {
   const signature = Buffer.from(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)))).toString("base64url");
   process.env.APP_SESSION_SECRET = "test-session-secret-12345678901234567890";
   return `fundedfence_session=${payload}.${signature}`;
+}
+
+async function testDeviceToken(claims, secret) {
+  const payload = Buffer.from(JSON.stringify(claims, Object.keys(claims).sort())).toString("base64url");
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = Buffer.from(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)))).toString("hex");
+  return `${payload}.${signature}`;
 }
