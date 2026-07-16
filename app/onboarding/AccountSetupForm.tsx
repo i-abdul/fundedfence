@@ -38,7 +38,7 @@ export function AccountSetupForm({ firms }: { firms: FirmOption[] }) {
         <select name="firm" value={firmId} onChange={(event) => chooseFirm(event.target.value)}>
           {firms.map((firm) => <option value={firm.id} key={firm.id}>{firm.label}</option>)}
         </select>
-        <small>FundedNext CFD pricing has been captured from the logged-in pricing page.</small>
+        <small>FundedNext CFD programs and rules are linked to captured official sources.</small>
       </label>
       <div className="form-grid">
         <label>
@@ -67,7 +67,7 @@ export function AccountSetupForm({ firms }: { firms: FirmOption[] }) {
         </label>
         <label><span>Platform</span><select name="platform" defaultValue="mt5"><option value="mt5">MetaTrader 5</option></select></label>
       </div>
-      <label className="check-row"><input type="checkbox" required /><span><strong>I understand this rule model still needs final verification.</strong><small>FundedFence will not activate hard protection until we verify the official FundedNext rules and your account parameters.</small></span></label>
+      <label className="check-row"><input type="checkbox" required /><span><strong>I confirm this is the correct program and phase.</strong><small>FundedFence assigns the matching versioned rule profile. Only an independently approved version can become effective.</small></span></label>
       <div className="form-actions"><Link className="button button-secondary" href="/dashboard">Back to preview</Link><button className="button button-primary" type="submit">Continue to connector <span>→</span></button></div>
     </form>
   );

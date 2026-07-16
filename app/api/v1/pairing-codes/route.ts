@@ -3,6 +3,8 @@ import { generatePairingCode, hashPairingCode, pairingCodeStatus, PAIRING_CODE_T
 import { jsonError, safeJson } from "@/lib/server/http";
 import { stableId } from "@/lib/server/crypto";
 import { requireDatabase, requireSecret } from "@/lib/server/runtime";
+import { findSeedRuleProfile } from "@/lib/product/fundednext-rule-catalog";
+import { ensureFundedNextRuleCatalog } from "@/lib/server/rule-profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,10 @@ type OwnedAccountRow = {
   id: string;
   organization_id: string;
   owner_user_id: string;
+};
+
+type ActiveRuleRow = {
+  id: string;
 };
 
 export async function GET(): Promise<Response> {
@@ -72,8 +78,13 @@ export async function POST(request: Request): Promise<Response> {
     const platform = optionalText(body.platform, 20) ?? "mt5";
     const accountPrice = optionalText(body.accountPrice, 40);
     const requestedAccountId = optionalAccountId(body.accountId);
+    const ruleProfile = firmId === "fundednext" ? findSeedRuleProfile(programId, phase) : undefined;
+    if (!ruleProfile) throw new Error("The selected firm, program, or phase does not have a validated rule profile.");
+    if (!ruleProfile.definition.applicableAccountSizesMinor.includes(accountSizeMinor)) throw new Error("The selected account size is not valid for this rule profile.");
+    if (ruleProfile.definition.currency !== currency || !ruleProfile.definition.platforms.includes(platform.toUpperCase())) throw new Error("The selected currency or platform is not supported by this rule profile.");
 
     const database = await requireDatabase();
+    await ensureFundedNextRuleCatalog(database);
     const pepper = await requireSecret("PAIRING_PEPPER");
     const now = new Date();
     const nowIso = now.toISOString();
@@ -88,6 +99,8 @@ export async function POST(request: Request): Promise<Response> {
     const accountOrganizationId = ownedAccount?.organization_id ?? organizationId;
     const accountOwnerUserId = ownedAccount?.owner_user_id ?? userId;
     const replacingDevice = Boolean(ownedAccount);
+    const activeRule = await database.prepare("SELECT rv.id FROM rule_sets rs JOIN rule_versions rv ON rv.id = rs.active_version_id WHERE rs.program_id = ? AND rv.verification_status = 'effective' LIMIT 1")
+      .bind(ruleProfile.programId).first<ActiveRuleRow>();
     const pairingId = `pair_${crypto.randomUUID().replace(/-/g, "")}`;
     const code = generatePairingCode();
     const codeHash = await hashPairingCode(code, pepper);
@@ -111,13 +124,13 @@ export async function POST(request: Request): Promise<Response> {
           .bind(nowIso, nowIso, accountId),
         database.prepare("UPDATE account_connections SET state = 'reconnecting', last_heartbeat_at = NULL, connector_version = NULL, updated_at = ? WHERE trading_account_id = ?")
           .bind(nowIso, accountId),
-        database.prepare("UPDATE trading_accounts SET status = 'pairing', updated_at = ? WHERE id = ?")
-          .bind(nowIso, accountId),
+        database.prepare("UPDATE trading_accounts SET program_id = ?, rule_version_id = ?, label = ?, account_size_minor = ?, currency = ?, status = 'pairing', updated_at = ? WHERE id = ?")
+          .bind(ruleProfile.programId, activeRule?.id ?? null, `${accountLabel} · ${firmLabel} ${programLabel}`, accountSizeMinor, currency, nowIso, accountId),
       );
     } else {
       statements.splice(3, 0,
-        database.prepare("INSERT INTO trading_accounts (id, organization_id, owner_user_id, program_id, rule_version_id, label, account_size_minor, currency, status, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, 'pairing', ?, ?)")
-          .bind(accountId, organizationId, userId, `${accountLabel} · ${firmLabel} ${programLabel}`, accountSizeMinor, currency, nowIso, nowIso),
+        database.prepare("INSERT INTO trading_accounts (id, organization_id, owner_user_id, program_id, rule_version_id, label, account_size_minor, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pairing', ?, ?)")
+          .bind(accountId, organizationId, userId, ruleProfile.programId, activeRule?.id ?? null, `${accountLabel} · ${firmLabel} ${programLabel}`, accountSizeMinor, currency, nowIso, nowIso),
       );
     }
     await database.batch(statements);

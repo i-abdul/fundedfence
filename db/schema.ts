@@ -32,11 +32,14 @@ export const propFirmPrograms = sqliteTable("prop_firm_programs", {
   id: text("id").primaryKey(),
   propFirmId: text("prop_firm_id").notNull().references(() => propFirms.id),
   name: text("name").notNull(),
+  programCode: text("program_code").notNull(),
   phase: text("phase").notNull(),
+  market: text("market").notNull().default("CFDs"),
+  status: text("status").notNull().default("draft"),
   platform: text("platform").notNull().default("MT5"),
   accountCurrency: text("account_currency").notNull().default("USD"),
   ...timestamps,
-}, (table) => [index("programs_firm_idx").on(table.propFirmId)]);
+}, (table) => [index("programs_firm_idx").on(table.propFirmId), uniqueIndex("programs_code_phase_unique").on(table.propFirmId, table.programCode, table.phase)]);
 
 export const ruleSets = sqliteTable("rule_sets", {
   id: text("id").primaryKey(),
@@ -54,7 +57,16 @@ export const ruleVersions = sqliteTable("rule_versions", {
   expiresAt: text("expires_at"),
   verificationStatus: text("verification_status").notNull().default("draft"),
   definitionJson: text("definition_json").notNull(),
+  contentHash: text("content_hash").notNull(),
+  interpretationNotes: text("interpretation_notes").notNull().default(""),
+  createdByUserId: text("created_by_user_id").references(() => users.id),
+  validatedByUserId: text("validated_by_user_id").references(() => users.id),
+  reviewedByUserId: text("reviewed_by_user_id").references(() => users.id),
+  activatedByUserId: text("activated_by_user_id").references(() => users.id),
   approvedByUserId: text("approved_by_user_id").references(() => users.id),
+  activatedAt: text("activated_at"),
+  supersededAt: text("superseded_at"),
+  rollbackOfVersionId: text("rollback_of_version_id"),
   ...timestamps,
 }, (table) => [uniqueIndex("rule_versions_set_version_unique").on(table.ruleSetId, table.version)]);
 
@@ -62,12 +74,25 @@ export const ruleSources = sqliteTable("rule_sources", {
   id: text("id").primaryKey(),
   ruleVersionId: text("rule_version_id").notNull().references(() => ruleVersions.id),
   sourceType: text("source_type").notNull(),
+  authorityClass: text("authority_class").notNull().default("confirmed-rule"),
   title: text("title").notNull(),
   url: text("url").notNull(),
   capturedAt: text("captured_at").notNull(),
   contentHash: text("content_hash").notNull(),
+  evidenceJson: text("evidence_json").notNull().default("{}"),
   ...timestamps,
 }, (table) => [index("rule_sources_version_idx").on(table.ruleVersionId)]);
+
+export const ruleVersionTransitions = sqliteTable("rule_version_transitions", {
+  id: text("id").primaryKey(),
+  ruleVersionId: text("rule_version_id").notNull().references(() => ruleVersions.id),
+  fromStatus: text("from_status"),
+  toStatus: text("to_status").notNull(),
+  actorType: text("actor_type").notNull(),
+  actorId: text("actor_id").notNull(),
+  reason: text("reason").notNull(),
+  occurredAt: text("occurred_at").notNull(),
+}, (table) => [index("rule_transitions_version_time_idx").on(table.ruleVersionId, table.occurredAt)]);
 
 export const tradingAccounts = sqliteTable("trading_accounts", {
   id: text("id").primaryKey(),
@@ -83,6 +108,18 @@ export const tradingAccounts = sqliteTable("trading_accounts", {
   status: text("status").notNull().default("pairing"),
   ...timestamps,
 }, (table) => [index("trading_accounts_owner_idx").on(table.ownerUserId), index("trading_accounts_org_idx").on(table.organizationId)]);
+
+export const ruleRecalculationJobs = sqliteTable("rule_recalculation_jobs", {
+  id: text("id").primaryKey(),
+  tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
+  fromRuleVersionId: text("from_rule_version_id"),
+  toRuleVersionId: text("to_rule_version_id").notNull().references(() => ruleVersions.id),
+  status: text("status").notNull().default("pending"),
+  reason: text("reason").notNull(),
+  requestedAt: text("requested_at").notNull(),
+  completedAt: text("completed_at"),
+  ...timestamps,
+}, (table) => [index("rule_recalc_account_status_idx").on(table.tradingAccountId, table.status), uniqueIndex("rule_recalc_account_version_unique").on(table.tradingAccountId, table.toRuleVersionId)]);
 
 export const accountConnections = sqliteTable("account_connections", {
   id: text("id").primaryKey(),

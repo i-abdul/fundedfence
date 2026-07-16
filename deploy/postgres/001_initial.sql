@@ -30,7 +30,10 @@ CREATE TABLE IF NOT EXISTS prop_firm_programs (
   id text PRIMARY KEY,
   prop_firm_id text NOT NULL REFERENCES prop_firms(id),
   name text NOT NULL,
+  program_code text NOT NULL,
   phase text NOT NULL,
+  market text NOT NULL DEFAULT 'CFDs',
+  status text NOT NULL DEFAULT 'draft',
   platform text NOT NULL DEFAULT 'MT5',
   account_currency text NOT NULL DEFAULT 'USD',
   created_at text NOT NULL,
@@ -38,6 +41,10 @@ CREATE TABLE IF NOT EXISTS prop_firm_programs (
 );
 
 CREATE INDEX IF NOT EXISTS programs_firm_idx ON prop_firm_programs (prop_firm_id);
+ALTER TABLE prop_firm_programs ADD COLUMN IF NOT EXISTS program_code text;
+ALTER TABLE prop_firm_programs ADD COLUMN IF NOT EXISTS market text NOT NULL DEFAULT 'CFDs';
+ALTER TABLE prop_firm_programs ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'draft';
+CREATE UNIQUE INDEX IF NOT EXISTS programs_code_phase_unique ON prop_firm_programs (prop_firm_id, program_code, phase);
 
 CREATE TABLE IF NOT EXISTS rule_sets (
   id text PRIMARY KEY,
@@ -58,25 +65,61 @@ CREATE TABLE IF NOT EXISTS rule_versions (
   expires_at text,
   verification_status text NOT NULL DEFAULT 'draft',
   definition_json text NOT NULL,
+  content_hash text NOT NULL,
+  interpretation_notes text NOT NULL DEFAULT '',
+  created_by_user_id text REFERENCES users(id),
+  validated_by_user_id text REFERENCES users(id),
+  reviewed_by_user_id text REFERENCES users(id),
+  activated_by_user_id text REFERENCES users(id),
   approved_by_user_id text REFERENCES users(id),
+  activated_at text,
+  superseded_at text,
+  rollback_of_version_id text,
   created_at text NOT NULL,
   updated_at text NOT NULL,
   UNIQUE (rule_set_id, version)
 );
 
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS content_hash text;
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS interpretation_notes text NOT NULL DEFAULT '';
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS created_by_user_id text REFERENCES users(id);
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS validated_by_user_id text REFERENCES users(id);
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS reviewed_by_user_id text REFERENCES users(id);
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS activated_by_user_id text REFERENCES users(id);
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS activated_at text;
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS superseded_at text;
+ALTER TABLE rule_versions ADD COLUMN IF NOT EXISTS rollback_of_version_id text;
+
 CREATE TABLE IF NOT EXISTS rule_sources (
   id text PRIMARY KEY,
   rule_version_id text NOT NULL REFERENCES rule_versions(id),
   source_type text NOT NULL,
+  authority_class text NOT NULL DEFAULT 'confirmed-rule',
   title text NOT NULL,
   url text NOT NULL,
   captured_at text NOT NULL,
   content_hash text NOT NULL,
+  evidence_json text NOT NULL DEFAULT '{}',
   created_at text NOT NULL,
   updated_at text NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS rule_sources_version_idx ON rule_sources (rule_version_id);
+ALTER TABLE rule_sources ADD COLUMN IF NOT EXISTS authority_class text NOT NULL DEFAULT 'confirmed-rule';
+ALTER TABLE rule_sources ADD COLUMN IF NOT EXISTS evidence_json text NOT NULL DEFAULT '{}';
+
+CREATE TABLE IF NOT EXISTS rule_version_transitions (
+  id text PRIMARY KEY,
+  rule_version_id text NOT NULL REFERENCES rule_versions(id),
+  from_status text,
+  to_status text NOT NULL,
+  actor_type text NOT NULL,
+  actor_id text NOT NULL,
+  reason text NOT NULL,
+  occurred_at text NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS rule_transitions_version_time_idx ON rule_version_transitions (rule_version_id, occurred_at);
 
 CREATE TABLE IF NOT EXISTS trading_accounts (
   id text PRIMARY KEY,
@@ -96,6 +139,22 @@ CREATE TABLE IF NOT EXISTS trading_accounts (
 
 CREATE INDEX IF NOT EXISTS trading_accounts_owner_idx ON trading_accounts (owner_user_id);
 CREATE INDEX IF NOT EXISTS trading_accounts_org_idx ON trading_accounts (organization_id);
+
+CREATE TABLE IF NOT EXISTS rule_recalculation_jobs (
+  id text PRIMARY KEY,
+  trading_account_id text NOT NULL REFERENCES trading_accounts(id),
+  from_rule_version_id text,
+  to_rule_version_id text NOT NULL REFERENCES rule_versions(id),
+  status text NOT NULL DEFAULT 'pending',
+  reason text NOT NULL,
+  requested_at text NOT NULL,
+  completed_at text,
+  created_at text NOT NULL,
+  updated_at text NOT NULL,
+  UNIQUE (trading_account_id, to_rule_version_id)
+);
+
+CREATE INDEX IF NOT EXISTS rule_recalc_account_status_idx ON rule_recalculation_jobs (trading_account_id, status);
 
 CREATE TABLE IF NOT EXISTS account_connections (
   id text PRIMARY KEY,

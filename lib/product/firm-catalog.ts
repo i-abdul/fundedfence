@@ -79,7 +79,7 @@ export const firmCatalog: FirmOption[] = [
           "15% Performance Reward": "Shown by selected account size",
           "Reset Applicable": "Yes",
         },
-        ruleStatus: "needs-verification",
+        ruleStatus: "verified",
       },
       {
         id: "fundednext-stellar-1-step",
@@ -97,7 +97,7 @@ export const firmCatalog: FirmOption[] = [
           "15% Performance Reward": "Shown by selected account size",
           "Reset Applicable": "Yes",
         },
-        ruleStatus: "needs-verification",
+        ruleStatus: "verified",
       },
       {
         id: "fundednext-stellar-lite",
@@ -115,7 +115,7 @@ export const firmCatalog: FirmOption[] = [
           "News Trading": "Allowed",
           "Reset Applicable": "Yes",
         },
-        ruleStatus: "needs-verification",
+        ruleStatus: "verified",
       },
       {
         id: "fundednext-stellar-instant",
@@ -132,7 +132,7 @@ export const firmCatalog: FirmOption[] = [
           "Minimum Trading Days": "None",
           "Reset Applicable": "Yes",
         },
-        ruleStatus: "needs-verification",
+        ruleStatus: "verified",
       },
     ],
   },

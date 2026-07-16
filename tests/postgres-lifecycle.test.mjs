@@ -16,9 +16,12 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   const isolatedConnectionUrl = new URL(baseConnectionString);
   isolatedConnectionUrl.searchParams.set("options", `-c search_path=${schema}`);
   const previousPostgresUrl = process.env.POSTGRES_URL;
+  const previousRuleAdmins = process.env.RULE_ADMIN_EMAILS;
   t.after(async () => {
     if (previousPostgresUrl === undefined) delete process.env.POSTGRES_URL;
     else process.env.POSTGRES_URL = previousPostgresUrl;
+    if (previousRuleAdmins === undefined) delete process.env.RULE_ADMIN_EMAILS;
+    else process.env.RULE_ADMIN_EMAILS = previousRuleAdmins;
     await testPool.end();
     await adminPool.query(`DROP SCHEMA "${schema}" CASCADE`);
     await adminPool.end();
@@ -34,6 +37,7 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   process.env.APP_SESSION_SECRET = sessionSecret;
   process.env.PAIRING_PEPPER = pairingPepper;
   process.env.CONNECTOR_TOKEN_SECRET = connectorSecret;
+  process.env.RULE_ADMIN_EMAILS = "owner-one@example.com";
   const env = {
     DB: database,
     APP_SESSION_SECRET: sessionSecret,
@@ -69,6 +73,27 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   assert.ok(pairedResponse);
   const paired = await pairedResponse.json();
   assert.equal(paired.accountId, replacementCode.accountId);
+
+  const profilesResponse = await api(worker, env, "/api/v1/rule-profiles", { cookie: firstCookie });
+  assert.equal(profilesResponse.status, 200);
+  const profilePayload = await profilesResponse.json();
+  assert.equal(profilePayload.canAdmin, true);
+  const phaseOneProfile = profilePayload.profiles.find((profile) => profile.programCode === "fundednext-stellar-2-step" && profile.phase === "Phase 1");
+  assert.ok(phaseOneProfile);
+  assert.equal(phaseOneProfile.versions[0].status, "validated");
+  assert.ok(phaseOneProfile.versions[0].sources.length >= 5);
+  const ruleVersionId = phaseOneProfile.versions[0].id;
+  const approval = await api(worker, env, "/api/v1/rule-profiles", { method: "POST", cookie: firstCookie, body: { action: "approve", versionId: ruleVersionId } });
+  if (approval.status !== 200) assert.fail(`Rule approval failed: ${await approval.text()}`);
+  const activation = await api(worker, env, "/api/v1/rule-profiles", { method: "POST", cookie: firstCookie, body: { action: "activate", versionId: ruleVersionId } });
+  if (activation.status !== 200) assert.fail(`Rule activation failed: ${await activation.text()}`);
+  const activationPayload = await activation.json();
+  assert.equal(activationPayload.affectedAccounts, 1);
+  const assignedRule = await testPool.query("SELECT program_id, rule_version_id FROM trading_accounts WHERE id = $1", [paired.accountId]);
+  assert.equal(assignedRule.rows[0].program_id, phaseOneProfile.programId);
+  assert.equal(assignedRule.rows[0].rule_version_id, ruleVersionId);
+  const recalculation = await testPool.query("SELECT status, reason FROM rule_recalculation_jobs WHERE trading_account_id = $1 AND to_rule_version_id = $2", [paired.accountId, ruleVersionId]);
+  assert.deepEqual(recalculation.rows[0], { status: "pending", reason: "rule-version-activation" });
 
   const refreshResponse = await api(worker, env, "/api/v1/connector/refresh", { method: "POST", headers: { authorization: `Bearer ${paired.refreshToken}` }, body: {} });
   assert.equal(refreshResponse.status, 200);
