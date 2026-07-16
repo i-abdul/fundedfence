@@ -138,11 +138,17 @@ async function positionStatements(database: AppDatabase, accountId: string, valu
     }
     if (position.stopLossPricePoints !== null && !isCanonicalMinorUnits(position.stopLossPricePoints)) throw new Error("Position stopLossPricePoints is invalid.");
     if (position.takeProfitPricePoints !== null && !isCanonicalMinorUnits(position.takeProfitPricePoints)) throw new Error("Position takeProfitPricePoints is invalid.");
+    const priceDigits = optionalInteger(position.priceDigits, 0, 10);
+    const tickSizePoints = optionalIntegerUnits(position.tickSizePoints, false);
+    const tickValueLossMinorPerLot = optionalIntegerUnits(position.tickValueLossMinorPerLot, false);
+    const metadataCount = [priceDigits, tickSizePoints, tickValueLossMinorPerLot].filter((value) => value !== null).length;
+    if (metadataCount !== 0 && metadataCount !== 3) throw new Error("Position contract metadata must be complete.");
+    const swapMinor = optionalIntegerUnits(position.swapMinor, true, true);
     const openedAt = requiredIso(position.openedAt, "openedAt");
     const id = await stableId("pos", `${accountId}:${ticket}`);
     activeTickets.push(ticket);
-    statements.push(database.prepare("INSERT INTO positions (id, trading_account_id, ticket, symbol, direction, volume_units, open_price_points, current_price_points, stop_loss_price_points, take_profit_price_points, floating_pnl_minor, opened_at, closed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?) ON CONFLICT(trading_account_id, ticket) DO UPDATE SET symbol = excluded.symbol, direction = excluded.direction, volume_units = excluded.volume_units, current_price_points = excluded.current_price_points, stop_loss_price_points = excluded.stop_loss_price_points, take_profit_price_points = excluded.take_profit_price_points, floating_pnl_minor = excluded.floating_pnl_minor, closed_at = NULL, updated_at = excluded.updated_at")
-      .bind(id, accountId, ticket, symbol, direction, position.volumeUnits, position.openPricePoints, position.currentPricePoints, position.stopLossPricePoints, position.takeProfitPricePoints, position.floatingPnlMinor, openedAt, nowIso, nowIso));
+    statements.push(database.prepare("INSERT INTO positions (id, trading_account_id, ticket, symbol, direction, volume_units, open_price_points, current_price_points, stop_loss_price_points, take_profit_price_points, price_digits, tick_size_points, tick_value_loss_minor_per_lot, swap_minor, floating_pnl_minor, opened_at, closed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?) ON CONFLICT(trading_account_id, ticket) DO UPDATE SET symbol = excluded.symbol, direction = excluded.direction, volume_units = excluded.volume_units, open_price_points = excluded.open_price_points, current_price_points = excluded.current_price_points, stop_loss_price_points = excluded.stop_loss_price_points, take_profit_price_points = excluded.take_profit_price_points, price_digits = excluded.price_digits, tick_size_points = excluded.tick_size_points, tick_value_loss_minor_per_lot = excluded.tick_value_loss_minor_per_lot, swap_minor = excluded.swap_minor, floating_pnl_minor = excluded.floating_pnl_minor, closed_at = NULL, updated_at = excluded.updated_at")
+      .bind(id, accountId, ticket, symbol, direction, position.volumeUnits, position.openPricePoints, position.currentPricePoints, position.stopLossPricePoints, position.takeProfitPricePoints, priceDigits, tickSizePoints, tickValueLossMinorPerLot, swapMinor, position.floatingPnlMinor, openedAt, nowIso, nowIso));
   }
   if (activeTickets.length === 0) {
     statements.push(database.prepare("UPDATE positions SET closed_at = COALESCE(closed_at, ?), updated_at = ? WHERE trading_account_id = ? AND closed_at IS NULL")
@@ -158,6 +164,20 @@ async function positionStatements(database: AppDatabase, accountId: string, valu
 function requiredText(value: unknown, field: string, maxLength: number): string {
   if (typeof value !== "string" || !value.trim() || value.length > maxLength) throw new Error(`Position ${field} is invalid.`);
   return value.trim();
+}
+
+function optionalInteger(value: unknown, minimum: number, maximum: number): number | null {
+  if (value == null) return null;
+  if (!Number.isInteger(value) || Number(value) < minimum || Number(value) > maximum) throw new Error("Position priceDigits is invalid.");
+  return Number(value);
+}
+
+function optionalIntegerUnits(value: unknown, allowZero: boolean, allowNegative = false): string | null {
+  if (value == null) return null;
+  if (!isCanonicalMinorUnits(value)) throw new Error("Position contract units are invalid.");
+  const parsed = BigInt(value);
+  if ((!allowNegative && parsed < 0n) || (!allowZero && parsed === 0n)) throw new Error("Position contract units are invalid.");
+  return value;
 }
 
 function requiredIso(value: unknown, field: string): string {

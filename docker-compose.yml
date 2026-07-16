@@ -1,5 +1,6 @@
 services:
   app:
+    image: fundedfence-app:local
     build: .
     restart: unless-stopped
     env_file:
@@ -9,6 +10,20 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  monitor:
+    image: fundedfence-app:local
+    restart: unless-stopped
+    command: ["npm", "run", "monitor:connections"]
+    env_file:
+      - .env.oci
+    environment:
+      POSTGRES_URL: postgres://fundedfence:${POSTGRES_PASSWORD}@db:5432/fundedfence
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
 
   db:
     image: postgres:16-alpine

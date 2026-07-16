@@ -181,6 +181,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .account-identity strong, .account-identity small { display: block; }
 .account-identity strong { font-size: 11px; font-weight: 590; }
 .account-identity small { color: #6f8077; font-size: 8px; margin-top: 3px; }
+.account-selector { background: #101f19; border: 1px solid #26382f; border-radius: 7px; color: #e9f2ed; font: inherit; font-size: 10px; font-weight: 590; max-width: 410px; min-height: 29px; padding: 5px 28px 5px 8px; }
+.account-selector:focus-visible { border-color: var(--mint-strong); outline: 2px solid rgba(99,214,156,.16); outline-offset: 1px; }
 .phase-pill, .status-pill, .panel-count { border-radius: 999px; font-size: 8px; font-style: normal; font-weight: 680; letter-spacing: .05em; padding: 6px 9px; text-transform: uppercase; }
 .phase-pill { background: #101f19; color: #84958c; }
 .live-state { align-items: center; color: var(--mint); display: flex; font-size: 9px; gap: 7px; margin-left: auto; }

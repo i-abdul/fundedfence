@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AccountContext } from "@/lib/product/firm-catalog";
 
-type PairingResult = { pairingCode: string; expiresAt: string; accountId: string };
+type PairingResult = { pairingCode: string; expiresAt: string; accountId: string; replacingDevice?: boolean };
 type PairingLifecycle = "active" | "used" | "expired";
 type TrackedAccount = {
   accountId: string;
@@ -98,6 +98,7 @@ export function PairingPanel({ authenticated, signInPath, accountContext }: { au
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          accountId: paired && trackedAccountId ? trackedAccountId : undefined,
           accountLabel: `${accountContext.accountSizeLabel} ${accountContext.phase}`,
           accountSizeMinor: accountContext.accountSizeMinor,
           accountPrice: accountContext.accountPrice,
@@ -156,13 +157,13 @@ export function PairingPanel({ authenticated, signInPath, accountContext }: { au
             : Array.from({ length: 6 }, (_, index) => <span key={index}>•</span>)}
         </div>
         {visibleCode && <p>Expires in {formatRemaining(remainingMs)}. Replacing it immediately invalidates this code.</p>}
-        {paired && <p>This single-use code has been consumed. The page will continue tracking this account after refresh or in another tab.</p>}
+        {paired && <p>This single-use code has been consumed. Re-pairing will revoke this connector immediately and keep the same account workspace and history.</p>}
         {resultExpired && !paired && <p>This code can no longer be used. Generate a new one before pairing MT5.</p>}
         {restoredActiveCode && <p>An unexpired code exists, but codes are shown only once. Generate a replacement if you did not save it.</p>}
         {!result && !paired && !restoredActiveCode && <p>The code is shown only after an authenticated account workspace is created.</p>}
         {message && <p className="form-error" role="alert">{message}</p>}
         {authenticated
-          ? <button className="button button-primary full" type="button" onClick={createCode} disabled={loading}>{loading ? "Creating secure code…" : visibleCode || restoredActiveCode ? "Replace pairing code" : "Generate pairing code"}</button>
+          ? <button className="button button-primary full" type="button" onClick={createCode} disabled={loading}>{loading ? "Creating secure code…" : paired ? "Re-pair this MT5 account" : visibleCode || restoredActiveCode ? "Replace pairing code" : "Generate pairing code"}</button>
           : <a className="button button-primary full" href={signInPath}>Sign in to generate code</a>}
       </div>
       <Diagnostics result={result} overview={overview} liveState={liveState} resultExpired={resultExpired} />

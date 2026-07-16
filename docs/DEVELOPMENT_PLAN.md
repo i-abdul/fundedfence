@@ -27,11 +27,12 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 ### Remaining Sprint 1 work
 
 - [ ] Add database-backed integration tests for expiry, reuse, replacement, tenant isolation, reconnect, duplicate events, and out-of-order events.
-- [ ] Add connector/device revocation and an explicit re-pair flow.
-- [ ] Capture symbol digits, point size, tick size, tick value, commission, swap, deals, pending orders, and partial closes.
-- [ ] Calculate auditable open risk at stop-loss from broker contract metadata.
-- [ ] Add a freshness monitor that records offline transitions and creates a connector-paused alert even when the dashboard is closed.
-- [ ] Add account selection for users with more than one connected account.
+- [x] Add connector/device revocation and an explicit same-account re-pair flow.
+- [x] Capture symbol digits, tick size, loss tick value, and swap for open positions.
+- [ ] Capture commission, deals, pending-order details, and partial closes.
+- [x] Calculate auditable open risk at stop-loss from broker contract metadata and flag missing stops.
+- [x] Add a PostgreSQL freshness monitor that records delayed/offline transitions and creates a deduplicated connector-paused alert while the dashboard is closed.
+- [x] Add remembered account selection for users with more than one account workspace.
 - [ ] Complete an end-to-end OCI/MT5 soak test covering restart, token refresh, network interruption, and recovery.
 
 ### Sprint 1 acceptance criteria

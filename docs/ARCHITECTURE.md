@@ -19,6 +19,7 @@ MT5 EA -> HTTPS pairing/ingestion -> validation + connector auth
 | Pairing | Single-use codes, source throttling, device issuance, refresh | `app/api/v1/pairing-codes`, `app/api/v1/connector` |
 | Connector protocol | Canonical envelopes, HMAC signatures, device tokens, replay window | `lib/domain/connector-protocol.ts` |
 | Ingestion | Sequence/idempotency checks, raw events, snapshots, positions, freshness | `app/api/v1/connector/events` |
+| Connection monitor | Persists delayed/offline transitions and creates one alert per interrupted heartbeat episode | `scripts/monitor-connections.mjs` |
 | Rules | Versioned definitions and sources; no UI hard-coding | `db/schema.ts`, `docs/RULE_ENGINE.md` |
 | Risk | Exact minor-unit drawdown and position-risk functions | `lib/domain` |
 | Audit | Append-oriented, hash-linked organization ledger | `audit_events` |

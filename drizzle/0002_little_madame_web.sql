@@ -1,0 +1,2 @@
+ALTER TABLE `connector_devices` ADD `pairing_code_id` text REFERENCES pairing_codes(id);--> statement-breakpoint
+CREATE UNIQUE INDEX `connector_devices_pairing_code_unique` ON `connector_devices` (`pairing_code_id`);

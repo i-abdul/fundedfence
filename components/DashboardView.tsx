@@ -29,19 +29,45 @@ type DashboardLiveState = {
     symbol: string;
     direction: "buy" | "sell";
     volume_units: string;
+    open_price_points: string;
+    current_price_points: string;
     stop_loss_price_points: string | null;
+    take_profit_price_points: string | null;
+    price_digits: number | null;
+    tick_size_points: string | null;
+    tick_value_loss_minor_per_lot: string | null;
+    swap_minor: string | null;
     floating_pnl_minor: string;
+    risk_at_stop_minor: string | null;
   }>;
+  riskSummary?: {
+    known_risk_minor: string;
+    positions_without_stop: number;
+    positions_without_metadata: number;
+    all_positions_covered: boolean;
+  };
   dataFreshness?: "live" | "delayed" | "offline";
 };
 
+type AccountListItem = {
+  id: string;
+  label: string;
+  account_size_minor: string;
+  currency: string;
+  status: string;
+  state: string | null;
+  data_freshness: "live" | "delayed" | "offline";
+};
+
 export function DashboardView({ userLabel }: { userLabel?: string }) {
-  const { liveState, loading } = useLiveAccount();
+  const { liveState, loading, accounts, selectedAccountId, selectAccount } = useLiveAccount();
   const liveAccount = liveState?.account;
   const liveSnapshot = liveState?.snapshot;
   const liveMode = Boolean(liveAccount);
   const currency = liveAccount?.currency ?? "USD";
   const freshness = liveState?.dataFreshness ?? "offline";
+  const livePositions = liveState?.positions ?? [];
+  const riskSummary = liveState?.riskSummary;
 
   return (
     <main className="dashboard-shell">
@@ -49,7 +75,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
         <span className="demo-dot" />
         {liveMode
           ? liveSnapshot
-            ? "Live MT5 balances are shown. Firm rules are not approved yet, so risk calculations remain disabled."
+            ? "Live MT5 balances, positions, and stop risk are shown. Firm rule limits remain disabled until their profiles are approved."
             : freshness === "offline"
               ? "Live protection is paused because the connector has not supplied a current snapshot."
               : "The MT5 account is paired and FundedFence is waiting for its first snapshot."
@@ -70,13 +96,13 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
       </div>
 
       <section className="account-strip" aria-label="Selected account">
-        <div className="account-identity"><span className="mini-shield">FF</span><span><strong>{liveAccount?.label ?? demoAccount.label}</strong><small>{liveMode ? "Connected MT5 account" : `${demoAccount.firm} · MT5`}</small></span></div>
+        <div className="account-identity"><span className="mini-shield">FF</span><span>{liveMode && accounts.length > 1 ? <select className="account-selector" aria-label="Select trading account" value={selectedAccountId ?? ""} onChange={(event) => selectAccount(event.target.value)}>{accounts.map((account) => <option value={account.id} key={account.id}>{account.label} · {freshnessLabel(account.data_freshness)}</option>)}</select> : <strong>{liveAccount?.label ?? demoAccount.label}</strong>}<small>{liveMode ? accounts.length > 1 ? `${accounts.length} account workspaces · MT5` : "Connected MT5 account" : `${demoAccount.firm} · MT5`}</small></span></div>
         <span className="phase-pill">{liveMode ? liveAccount?.status ?? "connected" : demoAccount.phase}</span>
         <div className={`live-state ${freshness}`}><span /> {liveMode ? freshnessLabel(freshness) : "Live preview"} <small>{liveMode ? heartbeatLabel(liveAccount?.last_heartbeat_at) : demoAccount.lastHeartbeat}</small></div>
       </section>
 
       <section className="health-grid">
-        {liveMode ? <PendingHealth snapshotReady={Boolean(liveSnapshot)} /> : <DemoHealth />}
+        {liveMode ? <PendingHealth snapshotReady={Boolean(liveSnapshot)} openPositionCount={livePositions.length} riskSummary={riskSummary} currency={currency} /> : <DemoHealth />}
 
         <article className="panel balance-panel">
           <div className="panel-heading"><div><p className="eyebrow">Current state</p><h2>{liveMode ? `${formatMoney(liveAccount?.account_size_minor, currency)} account` : `${demoAccount.accountSize} account`}</h2></div><button className="kebab" aria-label="Account options">···</button></div>
@@ -103,17 +129,17 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
 
       <section className="dashboard-columns">
         <article className="panel positions-panel" id="positions">
-          <div className="panel-heading"><div><p className="eyebrow">Exposure</p><h2>Open positions</h2></div><span className="panel-count">{liveMode ? liveState?.positions?.length ?? 0 : 3} open</span></div>
+          <div className="panel-heading"><div><p className="eyebrow">Exposure</p><h2>Open positions</h2></div><span className="panel-count">{liveMode ? livePositions.length : 3} open</span></div>
           <div className="positions-table" role="table" aria-label={liveMode ? "Live open positions" : "Illustrative open positions"}>
             <div className="position-row position-header" role="row"><span>Market</span><span>Position</span><span>Entry / current</span><span>Risk at stop</span><span>P&amp;L</span><span>Status</span></div>
-            {liveMode ? liveState?.positions?.map((position) => (
+            {liveMode ? livePositions.map((position) => (
               <div className="position-row" role="row" key={position.ticket}>
                 <span><strong>{position.symbol}</strong><small>{position.direction.toUpperCase()}</small></span>
                 <span>{formatLots(position.volume_units)} lots</span>
-                <span><strong>Live feed</strong><small>Price scale pending</small></span>
-                <span><strong>Not calculated</strong><small>{position.stop_loss_price_points ? "Stop-loss set" : "No stop-loss"}</small></span>
+                <span><strong>{formatPrice(position.open_price_points, position.price_digits)}</strong><small>{formatPrice(position.current_price_points, position.price_digits)}</small></span>
+                <span><strong>{position.risk_at_stop_minor === null ? "Not calculated" : formatMoney(position.risk_at_stop_minor, currency)}</strong><small>{position.stop_loss_price_points === null ? "No stop-loss" : position.risk_at_stop_minor === null ? "Contract data pending" : `SL ${formatPrice(position.stop_loss_price_points, position.price_digits)}`}</small></span>
                 <span className={position.floating_pnl_minor.startsWith("-") ? "negative" : "positive"}>{formatMoney(position.floating_pnl_minor, currency)}</span>
-                <span><em className={position.stop_loss_price_points ? "healthy" : "caution"}>{position.stop_loss_price_points ? "Observed" : "Review"}</em></span>
+                <span><em className={position.stop_loss_price_points !== null ? "healthy" : "caution"}>{position.stop_loss_price_points !== null ? "Protected" : "Missing stop"}</em></span>
               </div>
             )) : demoPositions.map((position) => (
               <div className="position-row" role="row" key={position.symbol}>
@@ -126,7 +152,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
               </div>
             ))}
           </div>
-          <div className="panel-footer">{liveMode ? <><span>Position telemetry: <strong>{liveState?.positions?.length ? "Received" : "No open positions"}</strong></span><span>Risk at all stops: <strong>Contract metadata required</strong></span></> : <><span>Projected equity at all stops: <strong>$100,202</strong></span><span>Remaining buffer: <strong>$1,962</strong></span></>}</div>
+          <div className="panel-footer">{liveMode ? <><span>Known risk at stops: <strong>{formatMoney(riskSummary?.known_risk_minor, currency)}</strong></span><span>Stop coverage: <strong>{riskCoverageLabel(livePositions.length, riskSummary)}</strong></span></> : <><span>Projected equity at all stops: <strong>$100,202</strong></span><span>Remaining buffer: <strong>$1,962</strong></span></>}</div>
         </article>
 
         <article className="panel daily-plan" id="simulator">
@@ -156,7 +182,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
         <article className="panel timeline-panel"><div className="panel-heading"><div><p className="eyebrow">Audit trail</p><h2>Account timeline</h2></div><span className="panel-count">Today</span></div><div className="timeline-list">{liveMode ? <><Timeline time={formatTimelineTime(liveAccount?.last_heartbeat_at)} title={`Connector ${freshnessLabel(freshness).toLowerCase()}`} detail={liveAccount?.last_heartbeat_at ? `Last heartbeat ${heartbeatLabel(liveAccount.last_heartbeat_at)}` : "No heartbeat has been received"} tone={freshness === "live" ? "healthy" : "caution"} /><Timeline time={formatTimelineTime(liveSnapshot?.observed_at)} title={liveSnapshot ? "Account snapshot received" : "Waiting for first snapshot"} detail={liveSnapshot ? `Balance and equity observed at ${formatTimestamp(liveSnapshot.observed_at)}` : "Keep MT5 and the EA running"} tone={liveSnapshot ? "healthy" : "caution"} /></> : <><Timeline time="14:32" title="Risk state recalculated" detail="Snapshot sequence 8,214 · all rule buffers healthy" tone="healthy" /><Timeline time="14:29" title="Stop-loss changed" detail="EURUSD stop moved to 1.08180 · risk reduced by $240" tone="neutral" /><Timeline time="14:17" title="News caution window" detail="Illustrative event restriction begins in 13 minutes" tone="caution" /><Timeline time="13:58" title="Connector heartbeat" detail="Round-trip 184 ms · sequence continuous" tone="healthy" /></>}</div></article>
         <article className="panel protection-panel"><span className="protection-mark">✓</span><p className="eyebrow">Read-only by design</p><h2>Your terminal stays in control.</h2><p>The connector observes account data and sends signed events. It contains no order placement, modification, or closing calls.</p><Link className="quiet-link" href="/pairing">Review connector setup →</Link></article>
       </section>
-      <footer className="product-footer"><span>FundedFence provides risk-monitoring tools, not financial advice or a guarantee of challenge success.</span><span>{liveMode ? "Balances and positions are live; rule outputs remain disabled." : "Data shown here is illustrative."}</span></footer>
+      <footer className="product-footer"><span>FundedFence provides risk-monitoring tools, not financial advice or a guarantee of challenge success.</span><span>{liveMode ? "Live telemetry and stop risk are active; firm rule outputs remain disabled." : "Data shown here is illustrative."}</span></footer>
     </main>
   );
 }
@@ -181,7 +207,7 @@ function DemoHealth() {
   );
 }
 
-function PendingHealth({ snapshotReady }: { snapshotReady: boolean }) {
+function PendingHealth({ snapshotReady, openPositionCount, riskSummary, currency }: { snapshotReady: boolean; openPositionCount: number; riskSummary: DashboardLiveState["riskSummary"]; currency: string }) {
   return (
     <article className="panel health-panel">
       <div className="panel-heading"><div><p className="eyebrow">Account health</p><h2>{snapshotReady ? "Rule verification required" : "Waiting for live account data"}</h2></div><span className="status-pill caution">Not active</span></div>
@@ -192,7 +218,7 @@ function PendingHealth({ snapshotReady }: { snapshotReady: boolean }) {
           <div className="health-metrics">
             <span><small>Daily buffer</small><strong>Pending rules</strong></span>
             <span><small>Total buffer</small><strong>Pending rules</strong></span>
-            <span><small>Open risk</small><strong>Pending metadata</strong></span>
+            <span><small>Open risk</small><strong>{openRiskLabel(openPositionCount, riskSummary, currency)}</strong></span>
             <span><small>Safe additional risk</small><strong>Not calculated</strong></span>
           </div>
         </div>
@@ -201,28 +227,47 @@ function PendingHealth({ snapshotReady }: { snapshotReady: boolean }) {
   );
 }
 
-function useLiveAccount(): { liveState: DashboardLiveState | null; loading: boolean } {
+function useLiveAccount(): { liveState: DashboardLiveState | null; loading: boolean; accounts: AccountListItem[]; selectedAccountId: string | null; selectAccount: (accountId: string) => void } {
+  const [accounts, setAccounts] = useState<AccountListItem[]>([]);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [liveState, setLiveState] = useState<DashboardLiveState | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    async function recoverAccount() {
+    async function loadAccounts() {
       try {
-        const response = await fetch("/api/v1/pairing-codes", { cache: "no-store" });
+        const response = await fetch("/api/v1/accounts", { cache: "no-store" });
         if (!response.ok) return;
-        const payload = await response.json() as { trackedAccount?: { accountId?: string } | null };
-        if (!cancelled) setAccountId(payload.trackedAccount?.accountId ?? null);
+        const payload = await response.json() as { accounts?: AccountListItem[] };
+        const availableAccounts = payload.accounts ?? [];
+        const savedAccountId = window.localStorage.getItem("fundedfence.selectedAccountId");
+        const selected = availableAccounts.find((account) => account.id === savedAccountId)?.id ?? availableAccounts[0]?.id ?? null;
+        if (!cancelled) {
+          setAccounts(availableAccounts);
+          setAccountId(selected);
+          if (selected) window.localStorage.setItem("fundedfence.selectedAccountId", selected);
+        }
       } catch {
-        // The dashboard falls back to the clearly labelled preview when recovery is unavailable.
+        // The dashboard falls back to the clearly labelled preview when account recovery is unavailable.
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-    void recoverAccount();
+    void loadAccounts();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    function synchronizeSelection(event: StorageEvent) {
+      if (event.key === "fundedfence.selectedAccountId" && event.newValue && accounts.some((account) => account.id === event.newValue)) {
+        setLiveState(null);
+        setAccountId(event.newValue);
+      }
+    }
+    window.addEventListener("storage", synchronizeSelection);
+    return () => window.removeEventListener("storage", synchronizeSelection);
+  }, [accounts]);
 
   useEffect(() => {
     if (!accountId) return;
@@ -245,7 +290,14 @@ function useLiveAccount(): { liveState: DashboardLiveState | null; loading: bool
     };
   }, [accountId]);
 
-  return { liveState, loading };
+  function selectAccount(selectedId: string) {
+    if (!accounts.some((account) => account.id === selectedId)) return;
+    setLiveState(null);
+    setAccountId(selectedId);
+    window.localStorage.setItem("fundedfence.selectedAccountId", selectedId);
+  }
+
+  return { liveState, loading, accounts, selectedAccountId: accountId, selectAccount };
 }
 
 function formatMoney(value: string | undefined, currency: string): string {
@@ -293,6 +345,33 @@ function formatLots(value: string): string {
   const whole = units / 10_000n;
   const fraction = (units % 10_000n).toString().padStart(4, "0").replace(/0+$/, "");
   return fraction ? `${whole}.${fraction}` : whole.toString();
+}
+
+function formatPrice(value: string | null | undefined, digits: number | null): string {
+  if (value == null || digits == null || !Number.isInteger(digits) || digits < 0 || digits > 10 || !/^-?\d+$/.test(value)) return "—";
+  const points = BigInt(value);
+  const negative = points < 0n;
+  const absolute = negative ? -points : points;
+  if (digits === 0) return `${negative ? "-" : ""}${absolute}`;
+  const divisor = 10n ** BigInt(digits);
+  const whole = absolute / divisor;
+  const fraction = (absolute % divisor).toString().padStart(digits, "0");
+  return `${negative ? "-" : ""}${whole}.${fraction}`;
+}
+
+function openRiskLabel(openPositionCount: number, summary: DashboardLiveState["riskSummary"], currency: string): string {
+  if (openPositionCount === 0) return formatMoney("0", currency);
+  if (!summary) return "Pending metadata";
+  const amount = formatMoney(summary.known_risk_minor, currency);
+  return summary.all_positions_covered ? amount : `${amount} known`;
+}
+
+function riskCoverageLabel(openPositionCount: number, summary: DashboardLiveState["riskSummary"]): string {
+  if (openPositionCount === 0) return "No open positions";
+  if (!summary) return "Waiting for connector 0.3.0";
+  if (summary.positions_without_stop > 0) return `${summary.positions_without_stop} missing stop${summary.positions_without_stop === 1 ? "" : "s"}`;
+  if (summary.positions_without_metadata > 0) return `${summary.positions_without_metadata} awaiting contract data`;
+  return "All open positions protected";
 }
 
 function Metric({ label, value, note, tone }: { label: string; value: string; note: string; tone: string }) {

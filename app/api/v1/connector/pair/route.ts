@@ -53,10 +53,14 @@ export async function POST(request: Request): Promise<Response> {
     await database.batch([
       database.prepare("UPDATE pairing_codes SET used_at = ?, updated_at = ? WHERE id = ? AND used_at IS NULL")
         .bind(nowIso, nowIso, row.id),
-      database.prepare("INSERT INTO connector_devices (id, trading_account_id, token_fingerprint, last_sequence, connector_version, platform_version, revoked_at, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?, NULL, ?, ?)")
-        .bind(deviceId, row.trading_account_id, tokenFingerprint, connectorVersion, platformVersion, nowIso, nowIso),
+      database.prepare("UPDATE connector_devices SET revoked_at = COALESCE(revoked_at, ?), updated_at = ? WHERE trading_account_id = ? AND revoked_at IS NULL")
+        .bind(nowIso, nowIso, row.trading_account_id),
+      database.prepare("INSERT INTO connector_devices (id, trading_account_id, pairing_code_id, token_fingerprint, last_sequence, connector_version, platform_version, revoked_at, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, NULL, ?, ?)")
+        .bind(deviceId, row.trading_account_id, row.id, tokenFingerprint, connectorVersion, platformVersion, nowIso, nowIso),
       database.prepare("INSERT OR IGNORE INTO account_connections (id, trading_account_id, state, connector_version, created_at, updated_at) VALUES (?, ?, 'reconnecting', ?, ?, ?)")
         .bind(connectionId, row.trading_account_id, connectorVersion, nowIso, nowIso),
+      database.prepare("UPDATE account_connections SET state = 'reconnecting', last_heartbeat_at = NULL, connector_version = ?, updated_at = ? WHERE trading_account_id = ?")
+        .bind(connectorVersion, nowIso, row.trading_account_id),
       database.prepare("UPDATE trading_accounts SET hashed_login = ?, server_identity = ?, status = 'connected', updated_at = ? WHERE id = ?")
         .bind(hashedLogin, serverIdentity, nowIso, row.trading_account_id),
       database.prepare("INSERT INTO audit_events (id, organization_id, trading_account_id, actor_type, actor_id, event_type, occurred_at, correlation_id, payload_json, previous_hash, event_hash) VALUES (?, ?, ?, 'connector', ?, 'connector.paired', ?, ?, ?, NULL, ?)")

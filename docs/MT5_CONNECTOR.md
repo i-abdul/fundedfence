@@ -4,13 +4,13 @@
 
 `connector/FundedFenceConnector.mq5` is an Expert Advisor only because MT5 permits `WebRequest` from EAs/scripts, not indicators. It is a data connector and contains no order placement, order modification, position close, stop-loss change, take-profit change, lot-sizing, copy-trading, signal, grid, or martingale logic.
 
-The prototype reads account state, open positions, pending-order count, terminal health, and trade-transaction identifiers. `OnTradeTransaction` performs no network I/O; it marks state dirty and lets `OnTimer` send the signed event and reconciliation.
+The prototype reads account state, open positions, broker contract metadata, pending-order count, terminal health, and trade-transaction identifiers. Position snapshots include symbol digits, trade tick size, loss tick value per lot, and swap so the server can calculate open risk at stop without assuming a universal Forex contract. `OnTradeTransaction` performs no network I/O; it marks state dirty and lets `OnTimer` send the signed event and reconciliation.
 
 ## Pairing and credentials
 
 The EA submits the single-use code, SHA-256 of MT5 login plus server, server identity, MT5 build, and connector version. It receives account-scoped access/refresh tokens and approved endpoints. Access tokens expire after 15 minutes and are refreshed with the revocable device identity.
 
-The current EA persists account-scoped credentials and the last sequence in the MT5 common data directory so terminal restarts can recover. Every event also carries the SHA-256 login/server identity and the backend rejects an event if the terminal account changed. Because the Common directory survives terminal reinstalls, `RePairSavedConnector` explicitly clears the prior device before a deliberate re-pair. It must be returned to `false` after pairing. Windows-protected storage remains required before a production release.
+The current EA persists account-scoped credentials and the last sequence in the MT5 common data directory so terminal restarts can recover. Every event also carries the SHA-256 login/server identity and the backend rejects an event if the terminal account changed. The web app's **Re-pair this MT5 account** action revokes the old device before issuing a replacement code while preserving the account workspace and history. A revoked EA clears its saved credential after the server confirms revocation. `RePairSavedConnector` remains a manual local reset and must be returned to `false` after pairing. Windows-protected storage remains required before a production release.
 
 ## Event cadence
 

@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS account_connections (
 CREATE TABLE IF NOT EXISTS connector_devices (
   id text PRIMARY KEY,
   trading_account_id text NOT NULL REFERENCES trading_accounts(id),
+  pairing_code_id text,
   token_fingerprint text NOT NULL,
   last_sequence integer NOT NULL DEFAULT 0,
   connector_version text NOT NULL,
@@ -137,6 +138,15 @@ CREATE TABLE IF NOT EXISTS pairing_codes (
 );
 
 CREATE INDEX IF NOT EXISTS pairing_codes_owner_idx ON pairing_codes (owner_user_id);
+
+ALTER TABLE connector_devices ADD COLUMN IF NOT EXISTS pairing_code_id text REFERENCES pairing_codes(id);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'connector_devices_pairing_code_fk' AND conrelid = 'connector_devices'::regclass) THEN
+    ALTER TABLE connector_devices ADD CONSTRAINT connector_devices_pairing_code_fk FOREIGN KEY (pairing_code_id) REFERENCES pairing_codes(id);
+  END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS connector_devices_pairing_code_unique ON connector_devices (pairing_code_id);
 
 CREATE TABLE IF NOT EXISTS pairing_rate_limits (
   key_hash text PRIMARY KEY,
@@ -176,6 +186,10 @@ CREATE TABLE IF NOT EXISTS positions (
   current_price_points text NOT NULL,
   stop_loss_price_points text,
   take_profit_price_points text,
+  price_digits integer,
+  tick_size_points text,
+  tick_value_loss_minor_per_lot text,
+  swap_minor text,
   floating_pnl_minor text NOT NULL,
   opened_at text NOT NULL,
   closed_at text,
@@ -185,6 +199,11 @@ CREATE TABLE IF NOT EXISTS positions (
 );
 
 CREATE INDEX IF NOT EXISTS positions_account_open_idx ON positions (trading_account_id, closed_at);
+
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS price_digits integer;
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS tick_size_points text;
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS tick_value_loss_minor_per_lot text;
+ALTER TABLE positions ADD COLUMN IF NOT EXISTS swap_minor text;
 
 CREATE TABLE IF NOT EXISTS trade_events (
   id text PRIMARY KEY,

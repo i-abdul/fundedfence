@@ -4,7 +4,7 @@
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
 #property copyright "FundedFence"
-#property version   "001.002"
+#property version   "001.003"
 #property strict
 #property description "Read-only signed account-data connector for FundedFence."
 
@@ -16,7 +16,7 @@ input int    IdleSnapshotSeconds = 15;
 input int    RequestTimeoutMs = 1800;
 input int    CurrencyExponent = 2;
 
-string CONNECTOR_VERSION = "0.2.1";
+string CONNECTOR_VERSION = "0.3.0";
 string PROTOCOL_VERSION = "1.1";
 string BUFFER_FILE = "FundedFenceConnector/pending-events-v1-1.jsonl";
 string CREDENTIALS_FILE = "FundedFenceConnector/credentials.tsv";
@@ -191,6 +191,17 @@ string BuildSnapshotPayload()
       if(ticket==0 || !PositionSelectByTicket(ticket))
          continue;
       string symbol=PositionGetString(POSITION_SYMBOL);
+      int price_digits=(int)SymbolInfoInteger(symbol,SYMBOL_DIGITS);
+      long tick_size_points=PriceToPoints(symbol,SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_SIZE));
+      double tick_value_loss=SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_VALUE_LOSS);
+      if(tick_value_loss<=0.0)
+         tick_value_loss=SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_VALUE);
+      long tick_value_loss_minor=MoneyToMinor(tick_value_loss);
+      string contract_metadata="";
+      if(tick_size_points>0 && tick_value_loss_minor>0)
+         contract_metadata="\"priceDigits\":"+(string)price_digits+","
+                           "\"tickSizePoints\":\""+(string)tick_size_points+"\","
+                           "\"tickValueLossMinorPerLot\":\""+(string)tick_value_loss_minor+"\",";
       if(!first) positions+=",";
       first=false;
       positions+="{\"ticket\":\""+(string)ticket+"\","
@@ -201,6 +212,8 @@ string BuildSnapshotPayload()
                  "\"currentPricePoints\":\""+(string)PriceToPoints(symbol,PositionGetDouble(POSITION_PRICE_CURRENT))+"\","
                  "\"stopLossPricePoints\":"+NullablePrice(symbol,PositionGetDouble(POSITION_SL))+","
                  "\"takeProfitPricePoints\":"+NullablePrice(symbol,PositionGetDouble(POSITION_TP))+","
+                 +contract_metadata+
+                 "\"swapMinor\":\""+(string)MoneyToMinor(PositionGetDouble(POSITION_SWAP))+"\","
                  "\"floatingPnlMinor\":\""+(string)MoneyToMinor(PositionGetDouble(POSITION_PROFIT))+"\","
                  "\"openedAt\":\""+IsoUtc((datetime)PositionGetInteger(POSITION_TIME))+"\"}";
      }
@@ -257,6 +270,7 @@ bool SendEnvelope(const string envelope)
       status=HttpPost(g_ingestion_endpoint,envelope,extra_headers,response);
       if(status==202 || status==200) return(true);
      }
+   if(g_device_id=="") return(true);
    if(status==409 && StringFind(response,"terminal_identity_changed")>=0)
      {
       Print("FundedFence: MT5 account identity changed. Connector credentials cleared; generate a new pairing code.");
@@ -275,6 +289,12 @@ bool RefreshAccessToken()
    int status=HttpPost(g_refresh_endpoint,"{}","Authorization: Bearer "+g_refresh_token+"\r\n",response);
    if(status!=200)
      {
+      if(status==401 && StringFind(response,"connector_revoked")>=0)
+        {
+         Print("FundedFence: this connector was replaced or revoked. Saved credentials cleared; enter the new pairing code.");
+         ClearCredentials();
+         return(false);
+        }
       if(status!=-1) PrintFormat("FundedFence: access-token refresh failed with HTTP %d: %s",status,response);
       return(false);
      }

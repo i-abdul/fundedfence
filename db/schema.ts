@@ -96,17 +96,6 @@ export const accountConnections = sqliteTable("account_connections", {
   ...timestamps,
 }, (table) => [uniqueIndex("account_connections_account_unique").on(table.tradingAccountId)]);
 
-export const connectorDevices = sqliteTable("connector_devices", {
-  id: text("id").primaryKey(),
-  tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
-  tokenFingerprint: text("token_fingerprint").notNull(),
-  lastSequence: integer("last_sequence").notNull().default(0),
-  connectorVersion: text("connector_version").notNull(),
-  platformVersion: text("platform_version").notNull(),
-  revokedAt: text("revoked_at"),
-  ...timestamps,
-}, (table) => [index("connector_devices_account_idx").on(table.tradingAccountId)]);
-
 export const pairingCodes = sqliteTable("pairing_codes", {
   id: text("id").primaryKey(),
   tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
@@ -117,6 +106,18 @@ export const pairingCodes = sqliteTable("pairing_codes", {
   attemptsRemaining: integer("attempts_remaining").notNull().default(5),
   ...timestamps,
 }, (table) => [uniqueIndex("pairing_codes_hash_unique").on(table.codeHash), index("pairing_codes_owner_idx").on(table.ownerUserId)]);
+
+export const connectorDevices = sqliteTable("connector_devices", {
+  id: text("id").primaryKey(),
+  tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
+  pairingCodeId: text("pairing_code_id").references(() => pairingCodes.id),
+  tokenFingerprint: text("token_fingerprint").notNull(),
+  lastSequence: integer("last_sequence").notNull().default(0),
+  connectorVersion: text("connector_version").notNull(),
+  platformVersion: text("platform_version").notNull(),
+  revokedAt: text("revoked_at"),
+  ...timestamps,
+}, (table) => [index("connector_devices_account_idx").on(table.tradingAccountId), uniqueIndex("connector_devices_pairing_code_unique").on(table.pairingCodeId)]);
 
 export const pairingRateLimits = sqliteTable("pairing_rate_limits", {
   keyHash: text("key_hash").primaryKey(),
@@ -152,6 +153,10 @@ export const positions = sqliteTable("positions", {
   currentPricePoints: text("current_price_points").notNull(),
   stopLossPricePoints: text("stop_loss_price_points"),
   takeProfitPricePoints: text("take_profit_price_points"),
+  priceDigits: integer("price_digits"),
+  tickSizePoints: text("tick_size_points"),
+  tickValueLossMinorPerLot: text("tick_value_loss_minor_per_lot"),
+  swapMinor: text("swap_minor"),
   floatingPnlMinor: text("floating_pnl_minor").notNull(),
   openedAt: text("opened_at").notNull(),
   closedAt: text("closed_at"),

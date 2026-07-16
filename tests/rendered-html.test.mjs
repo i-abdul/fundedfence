@@ -67,6 +67,10 @@ test("renders FundedNext account setup options", async () => {
 });
 
 test("denies account data and pairing-code creation without browser identity", async () => {
+  const accountsResponse = await render("/api/v1/accounts");
+  assert.equal(accountsResponse.status, 401);
+  assert.match(await accountsResponse.text(), /authentication_required/);
+
   const accountResponse = await render("/api/v1/accounts/acct_1234567890abcdef1234567890abcdef/live");
   assert.equal(accountResponse.status, 401);
   assert.match(await accountResponse.text(), /authentication_required/);

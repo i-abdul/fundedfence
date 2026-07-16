@@ -1,8 +1,26 @@
 import { getAppUser } from "@/lib/server/auth";
+import { calculatePositionRisk } from "@/lib/domain/position-risk";
 import { jsonError } from "@/lib/server/http";
 import { requireDatabase } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
+
+type PositionRow = {
+  ticket: string;
+  symbol: string;
+  direction: "buy" | "sell";
+  volume_units: string;
+  open_price_points: string;
+  current_price_points: string;
+  stop_loss_price_points: string | null;
+  take_profit_price_points: string | null;
+  price_digits: number | null;
+  tick_size_points: string | null;
+  tick_value_loss_minor_per_lot: string | null;
+  swap_minor: string | null;
+  floating_pnl_minor: string;
+  opened_at: string;
+};
 
 export async function GET(_request: Request, context: { params: Promise<{ accountId: string }> }): Promise<Response> {
   const correlationId = crypto.randomUUID();
@@ -17,11 +35,48 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
     if (!account) return jsonError(404, "account_not_found", "The account was not found.", correlationId);
     const snapshot = await database.prepare("SELECT observed_at, balance_minor, equity_minor, margin_minor, free_margin_minor, floating_pnl_minor, server_time FROM account_snapshots WHERE trading_account_id = ? ORDER BY sequence DESC LIMIT 1")
       .bind(accountId).first<Record<string, unknown>>();
-    const positions = await database.prepare("SELECT ticket, symbol, direction, volume_units, open_price_points, current_price_points, stop_loss_price_points, take_profit_price_points, floating_pnl_minor, opened_at FROM positions WHERE trading_account_id = ? AND closed_at IS NULL ORDER BY opened_at DESC")
-      .bind(accountId).all<Record<string, unknown>>();
-    return Response.json({ account, snapshot: snapshot ?? null, positions: positions.results, dataFreshness: freshness(account.last_heartbeat_at) });
+    const positionRows = await database.prepare("SELECT ticket, symbol, direction, volume_units, open_price_points, current_price_points, stop_loss_price_points, take_profit_price_points, price_digits, tick_size_points, tick_value_loss_minor_per_lot, swap_minor, floating_pnl_minor, opened_at FROM positions WHERE trading_account_id = ? AND closed_at IS NULL ORDER BY opened_at DESC")
+      .bind(accountId).all<PositionRow>();
+    const positions = positionRows.results.map((position) => ({
+      ...position,
+      risk_at_stop_minor: riskAtStop(position),
+    }));
+    const positionsWithoutStop = positions.filter((position) => position.stop_loss_price_points === null).length;
+    const positionsWithoutMetadata = positions.filter((position) => position.stop_loss_price_points !== null && position.risk_at_stop_minor === null).length;
+    const knownRiskMinor = positions.reduce((total, position) => total + (position.risk_at_stop_minor === null ? 0n : BigInt(position.risk_at_stop_minor)), 0n);
+    return Response.json(
+      {
+        account,
+        snapshot: snapshot ?? null,
+        positions,
+        riskSummary: {
+          known_risk_minor: knownRiskMinor.toString(),
+          positions_without_stop: positionsWithoutStop,
+          positions_without_metadata: positionsWithoutMetadata,
+          all_positions_covered: positionsWithoutStop === 0 && positionsWithoutMetadata === 0,
+        },
+        dataFreshness: freshness(account.last_heartbeat_at),
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch {
     return jsonError(503, "live_data_unavailable", "Live account data is temporarily unavailable.", correlationId);
+  }
+}
+
+function riskAtStop(position: PositionRow): string | null {
+  if (position.stop_loss_price_points === null || position.tick_size_points === null || position.tick_value_loss_minor_per_lot === null) return null;
+  try {
+    return calculatePositionRisk({
+      direction: position.direction,
+      currentPricePoints: position.current_price_points,
+      stopLossPricePoints: position.stop_loss_price_points,
+      tickSizePoints: position.tick_size_points,
+      tickValueLossMinorPerLot: position.tick_value_loss_minor_per_lot,
+      volumeUnits: position.volume_units,
+    })?.toString() ?? null;
+  } catch {
+    return null;
   }
 }
 

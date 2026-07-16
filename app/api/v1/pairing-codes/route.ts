@@ -20,6 +20,12 @@ type PairingRow = AccountRow & {
   used_at: string | null;
 };
 
+type OwnedAccountRow = {
+  id: string;
+  organization_id: string;
+  owner_user_id: string;
+};
+
 export async function GET(): Promise<Response> {
   const correlationId = crypto.randomUUID();
   try {
@@ -65,6 +71,7 @@ export async function POST(request: Request): Promise<Response> {
     const phase = optionalText(body.phase, 40);
     const platform = optionalText(body.platform, 20) ?? "mt5";
     const accountPrice = optionalText(body.accountPrice, 40);
+    const requestedAccountId = optionalAccountId(body.accountId);
 
     const database = await requireDatabase();
     const pepper = await requireSecret("PAIRING_PEPPER");
@@ -72,28 +79,50 @@ export async function POST(request: Request): Promise<Response> {
     const nowIso = now.toISOString();
     const userId = await stableId("usr", user.email.toLowerCase());
     const organizationId = await stableId("org", user.email.toLowerCase());
-    const accountId = `acct_${crypto.randomUUID().replace(/-/g, "")}`;
+    const ownedAccount = requestedAccountId
+      ? await database.prepare("SELECT ta.id, ta.organization_id, ta.owner_user_id FROM trading_accounts ta JOIN users u ON u.id = ta.owner_user_id WHERE ta.id = ? AND u.email = ? LIMIT 1")
+        .bind(requestedAccountId, user.email.toLowerCase()).first<OwnedAccountRow>()
+      : null;
+    if (requestedAccountId && !ownedAccount) throw new Error("The account is not available for re-pairing.");
+    const accountId = ownedAccount?.id ?? `acct_${crypto.randomUUID().replace(/-/g, "")}`;
+    const accountOrganizationId = ownedAccount?.organization_id ?? organizationId;
+    const accountOwnerUserId = ownedAccount?.owner_user_id ?? userId;
+    const replacingDevice = Boolean(ownedAccount);
     const pairingId = `pair_${crypto.randomUUID().replace(/-/g, "")}`;
     const code = generatePairingCode();
     const codeHash = await hashPairingCode(code, pepper);
     const expiresAt = new Date(now.getTime() + PAIRING_CODE_TTL_MS).toISOString();
 
-    await database.batch([
+    const statements = [
       database.prepare("INSERT OR IGNORE INTO organizations (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
         .bind(organizationId, `${user.displayName}'s workspace`, nowIso, nowIso),
       database.prepare("INSERT OR IGNORE INTO users (id, organization_id, email, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(userId, organizationId, user.email.toLowerCase(), user.displayName, nowIso, nowIso),
       database.prepare("UPDATE pairing_codes SET expires_at = ?, updated_at = ? WHERE owner_user_id = ? AND used_at IS NULL AND expires_at > ?")
         .bind(nowIso, nowIso, userId, nowIso),
-      database.prepare("INSERT INTO trading_accounts (id, organization_id, owner_user_id, program_id, rule_version_id, label, account_size_minor, currency, status, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, 'pairing', ?, ?)")
-        .bind(accountId, organizationId, userId, `${accountLabel} · ${firmLabel} ${programLabel}`, accountSizeMinor, currency, nowIso, nowIso),
       database.prepare("INSERT INTO pairing_codes (id, trading_account_id, owner_user_id, code_hash, expires_at, used_at, attempts_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, 5, ?, ?)")
-        .bind(pairingId, accountId, userId, codeHash, expiresAt, nowIso, nowIso),
-      database.prepare("INSERT INTO audit_events (id, organization_id, trading_account_id, actor_type, actor_id, event_type, occurred_at, correlation_id, payload_json, previous_hash, event_hash) VALUES (?, ?, ?, 'user', ?, 'pairing.code_created', ?, ?, ?, NULL, ?)")
-        .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, organizationId, accountId, userId, nowIso, correlationId, JSON.stringify({ expiresAt, firmId, firmLabel, programId, programLabel, phase, platform, accountPrice }), codeHash),
-    ]);
+        .bind(pairingId, accountId, accountOwnerUserId, codeHash, expiresAt, nowIso, nowIso),
+      database.prepare("INSERT INTO audit_events (id, organization_id, trading_account_id, actor_type, actor_id, event_type, occurred_at, correlation_id, payload_json, previous_hash, event_hash) VALUES (?, ?, ?, 'user', ?, ?, ?, ?, ?, NULL, ?)")
+        .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, accountOrganizationId, accountId, accountOwnerUserId, replacingDevice ? "connector.repair_requested" : "pairing.code_created", nowIso, correlationId, JSON.stringify({ expiresAt, firmId, firmLabel, programId, programLabel, phase, platform, accountPrice }), codeHash),
+    ];
+    if (replacingDevice) {
+      statements.splice(3, 0,
+        database.prepare("UPDATE connector_devices SET revoked_at = COALESCE(revoked_at, ?), updated_at = ? WHERE trading_account_id = ? AND revoked_at IS NULL")
+          .bind(nowIso, nowIso, accountId),
+        database.prepare("UPDATE account_connections SET state = 'reconnecting', last_heartbeat_at = NULL, connector_version = NULL, updated_at = ? WHERE trading_account_id = ?")
+          .bind(nowIso, accountId),
+        database.prepare("UPDATE trading_accounts SET status = 'pairing', updated_at = ? WHERE id = ?")
+          .bind(nowIso, accountId),
+      );
+    } else {
+      statements.splice(3, 0,
+        database.prepare("INSERT INTO trading_accounts (id, organization_id, owner_user_id, program_id, rule_version_id, label, account_size_minor, currency, status, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, 'pairing', ?, ?)")
+          .bind(accountId, organizationId, userId, `${accountLabel} · ${firmLabel} ${programLabel}`, accountSizeMinor, currency, nowIso, nowIso),
+      );
+    }
+    await database.batch(statements);
 
-    return Response.json({ pairingCode: code, expiresAt, accountId, singleUse: true }, { status: 201 });
+    return Response.json({ pairingCode: code, expiresAt, accountId, singleUse: true, replacingDevice }, { status: 201 });
   } catch (error) {
     return jsonError(400, "pairing_code_not_created", publicMessage(error), correlationId);
   }
@@ -119,6 +148,12 @@ function optionalText(value: unknown, maxLength: number): string | undefined {
   if (value == null || value === "") return undefined;
   if (typeof value !== "string" || value.length > maxLength) throw new Error("Optional account metadata is invalid.");
   return value.trim();
+}
+
+function optionalAccountId(value: unknown): string | undefined {
+  if (value == null || value === "") return undefined;
+  if (typeof value !== "string" || !/^acct_[a-f0-9]{32}$/.test(value)) throw new Error("The account identifier is invalid.");
+  return value;
 }
 
 function requiredMinor(value: unknown, field: string): string {
