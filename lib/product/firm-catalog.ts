@@ -31,6 +31,8 @@ const stellarTwoStepSizes: AccountSizeOption[] = [
   { label: "$200,000 USD", valueMinor: "20000000", price: "$1,099.99" },
 ];
 
+const freeTrialSizes: AccountSizeOption[] = stellarTwoStepSizes.map(({ label, valueMinor }) => ({ label, valueMinor, price: "Free" }));
+
 const stellarOneStepSizes: AccountSizeOption[] = [
   { label: "$6,000 USD", valueMinor: "600000", price: "$49.49", compareAtPrice: "$65.99" },
   { label: "$15,000 USD", valueMinor: "1500000", price: "$97.49", compareAtPrice: "$129.99" },
@@ -62,6 +64,23 @@ export const firmCatalog: FirmOption[] = [
     label: "FundedNext",
     sourceUrl: "https://fundednext.com/",
     programs: [
+      {
+        id: "fundednext-free-trial",
+        label: "Free Trial",
+        market: "CFDs",
+        phases: ["Trial"],
+        accountSizes: freeTrialSizes,
+        pricingRules: {
+          "Profit Target": "5%",
+          "Daily Loss Limit": "5%",
+          "Maximum Loss Limit": "10%",
+          "Minimum Trading Days": "3 Days",
+          "Time Limit": "14 calendar days from first trade",
+          "Maximum Open Positions": "30",
+          "Expert Advisors": "Prohibited by official Free Trial rules",
+        },
+        ruleStatus: "verified",
+      },
       {
         id: "fundednext-stellar-2-step",
         label: "Stellar 2-Step",

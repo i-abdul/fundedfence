@@ -10,6 +10,7 @@ export type SeedRuleProfile = {
   programId: string;
   ruleSetId: string;
   versionId: string;
+  version: number;
   definition: RuleDefinition;
   sources: OfficialRuleSource[];
 };
@@ -21,6 +22,7 @@ const lossIncludes: LossRule["includes"] = ["closed-pnl", "floating-pnl", "commi
 const dailyReset: DailyLossRule["reset"] = { at: "00:00", timezone: "broker-server", daylightSaving: "GMT+3", standardTime: "GMT+2" };
 
 const accountSizes = {
+  "fundednext-free-trial": ["600000", "1500000", "2500000", "5000000", "10000000", "20000000"],
   "fundednext-stellar-2-step": ["600000", "1500000", "2500000", "5000000", "10000000", "20000000"],
   "fundednext-stellar-1-step": ["600000", "1500000", "2500000", "5000000", "10000000", "20000000"],
   "fundednext-stellar-lite": ["500000", "1000000", "2500000", "5000000", "10000000", "20000000"],
@@ -28,6 +30,11 @@ const accountSizes = {
 } as const;
 
 const sources = {
+  freeTrial: {
+    title: "FundedNext Free Trial Rules",
+    url: "https://help.fundednext.com/en/articles/8902893-fundednext-free-trial-rules",
+    facts: { process: "1-step", profitTargetPercent: 5, minimumTradingDays: 3, trialCalendarDays: 14, dailyLossPercent: 5, maximumLossPercent: 10, reset: "midnight server time", weekendHolding: true, newsTrading: true, expertAdvisorsAllowed: false, maximumOpenPositions: 30, platform: "MT5 except US clients" },
+  },
   loss: {
     title: "Daily Loss Limit vs. Maximum Loss Limit",
     url: "https://help.fundednext.com/en/articles/9941519-daily-loss-limit-vs-maximum-loss-limit",
@@ -71,7 +78,7 @@ const sources = {
   instantLoss: {
     title: "Daily and Maximum Loss Limits for Stellar Instant Accounts",
     url: "https://help.fundednext.com/en/articles/11641163-what-are-the-daily-loss-limit-and-the-maximum-loss-limit-for-the-stellar-instant-accounts",
-    facts: { dailyLoss: null, maximumLossPercent: 6, model: "trailing", cap: "initial balance", resetsAfterWithdrawal: false },
+    facts: { dailyLoss: null, maximumLossPercent: 6, model: "trailing", highWaterBasis: "balance", breachBasis: "equity", cap: "initial balance", resetsAfterWithdrawal: false },
   },
   instantRules: {
     title: "Rules for the Stellar Instant Account",
@@ -111,6 +118,9 @@ function definition(input: {
   minimumDays: number;
   dailyBps: number | null;
   maximumLoss: LossRule;
+  maximumDays?: number | null;
+  expertAdvisors?: RuleDefinition["expertAdvisors"];
+  maximumOpenPositions?: number | null;
   funded?: boolean;
   instant?: boolean;
 }): RuleDefinition {
@@ -127,13 +137,15 @@ function definition(input: {
     applicableAccountSizesMinor: [...accountSizes[input.programCode]],
     profitTargetBps: input.targetBps,
     minimumTradingDays: input.minimumDays,
-    maximumTradingDays: null,
+    maximumTradingDays: input.maximumDays ?? null,
     dailyLoss: input.dailyBps === null ? null : dailyLoss(input.dailyBps),
     maximumLoss: input.maximumLoss,
     holding: { overnight: "allowed", weekend: "allowed" },
     news: { mode: rewardAdjustment ? "allowed-reward-adjustment" : "allowed", windowMinutesBefore: rewardAdjustment ? 5 : 0, windowMinutesAfter: rewardAdjustment ? 5 : 0, qualifyingProfitBps: rewardAdjustment ? 4_000 : 10_000, affectedInstrumentsOnly: rewardAdjustment },
     consistency: { mode: input.instant ? "none" : "unknown" },
     copyTrading: { mode: input.instant ? "same-owner-only" : "unknown" },
+    expertAdvisors: input.expertAdvisors ?? { mode: "unknown", note: "No program-specific expert-advisor source is attached to this profile." },
+    maximumOpenPositions: input.maximumOpenPositions ?? null,
     inactivityDays: null,
     payoutEligibility: { status: input.funded || input.instant ? "requires-separate-profile" : "not-applicable" },
     interpretationNotes: [
@@ -144,12 +156,13 @@ function definition(input: {
   };
 }
 
-function seed(programCode: keyof typeof accountSizes, slug: string, rule: RuleDefinition, profileSources: OfficialRuleSource[]): SeedRuleProfile {
+function seed(programCode: keyof typeof accountSizes, slug: string, rule: RuleDefinition, profileSources: OfficialRuleSource[], version = 1): SeedRuleProfile {
   if (rule.programCode !== programCode) throw new Error(`Rule profile ${slug} has a mismatched program code.`);
   return {
     programId: `program_${slug}`,
     ruleSetId: `ruleset_${slug}`,
-    versionId: `rulever_${slug}_v1`,
+    versionId: `rulever_${slug}_v${version}`,
+    version,
     definition: rule,
     sources: profileSources,
   };
@@ -158,6 +171,7 @@ function seed(programCode: keyof typeof accountSizes, slug: string, rule: RuleDe
 const commonChallengeSources = [sources.loss, sources.daily, sources.minimumDays, sources.holding, sources.news];
 
 export const fundedNextRuleProfiles: SeedRuleProfile[] = [
+  seed("fundednext-free-trial", "fundednext_free_trial", definition({ programCode: "fundednext-free-trial", programName: "Free Trial", phase: "Trial", targetBps: 500, minimumDays: 3, maximumDays: 14, dailyBps: 500, maximumLoss: staticLoss(1_000), expertAdvisors: { mode: "prohibited", note: "FundedNext says EAs are not permissible on Free Trial accounts; whether a strictly read-only monitoring EA is exempt requires confirmation from FundedNext." }, maximumOpenPositions: 30 }), [sources.freeTrial]),
   seed("fundednext-stellar-2-step", "fundednext_stellar_2_step_phase_1", definition({ programCode: "fundednext-stellar-2-step", programName: "Stellar 2-Step", phase: "Phase 1", targetBps: 800, minimumDays: 5, dailyBps: 500, maximumLoss: staticLoss(1_000) }), [sources.twoStepTarget, ...commonChallengeSources]),
   seed("fundednext-stellar-2-step", "fundednext_stellar_2_step_phase_2", definition({ programCode: "fundednext-stellar-2-step", programName: "Stellar 2-Step", phase: "Phase 2", targetBps: 500, minimumDays: 5, dailyBps: 500, maximumLoss: staticLoss(1_000) }), [sources.twoStepTarget, ...commonChallengeSources]),
   seed("fundednext-stellar-2-step", "fundednext_stellar_2_step_funded", definition({ programCode: "fundednext-stellar-2-step", programName: "Stellar 2-Step", phase: "Funded", targetBps: null, minimumDays: 0, dailyBps: 500, maximumLoss: staticLoss(1_000), funded: true }), [sources.twoStepTarget, ...commonChallengeSources]),
@@ -167,8 +181,18 @@ export const fundedNextRuleProfiles: SeedRuleProfile[] = [
   seed("fundednext-stellar-lite", "fundednext_stellar_lite_phase_2", definition({ programCode: "fundednext-stellar-lite", programName: "Stellar Lite", phase: "Phase 2", targetBps: 400, minimumDays: 5, dailyBps: 400, maximumLoss: staticLoss(800) }), [sources.liteTarget, ...commonChallengeSources]),
   seed("fundednext-stellar-lite", "fundednext_stellar_lite_funded", definition({ programCode: "fundednext-stellar-lite", programName: "Stellar Lite", phase: "Funded", targetBps: null, minimumDays: 0, dailyBps: 400, maximumLoss: staticLoss(800), funded: true }), [sources.liteTarget, ...commonChallengeSources]),
   seed("fundednext-stellar-instant", "fundednext_stellar_instant_funded", definition({ programCode: "fundednext-stellar-instant", programName: "Stellar Instant", phase: "Instant funded", targetBps: null, minimumDays: 0, dailyBps: null, maximumLoss: { limitBps: 600, model: "trailing-until-initial", breachBasis: "equity", reference: "initial-balance", cadence: "intraday", includes: lossIncludes }, instant: true }), [sources.instantLoss, sources.instantRules, sources.instantNews, sources.instantDays, sources.instantConsistency]),
+  seed("fundednext-stellar-instant", "fundednext_stellar_instant_funded", {
+    ...definition({ programCode: "fundednext-stellar-instant", programName: "Stellar Instant", phase: "Instant funded", targetBps: null, minimumDays: 0, dailyBps: null, maximumLoss: { limitBps: 600, model: "trailing-until-initial", breachBasis: "equity", trailingBasis: "balance", reference: "initial-balance", cadence: "intraday", includes: lossIncludes }, instant: true }),
+    interpretationNotes: [
+      "Official-source interpretation captured on 2026-07-16; activation requires independent approval.",
+      "Version 2 explicitly separates the highest-balance trailing reference from the equity breach basis.",
+      "News trading is allowed, but qualifying profitable executions in the official window receive the documented reward adjustment.",
+    ],
+  }, [sources.instantLoss, sources.instantRules, sources.instantNews, sources.instantDays, sources.instantConsistency], 2),
 ];
 
 export function findSeedRuleProfile(programCode: string | undefined, phase: string | undefined): SeedRuleProfile | undefined {
-  return fundedNextRuleProfiles.find((profile) => profile.definition.programCode === programCode && profile.definition.phase === phase);
+  return fundedNextRuleProfiles
+    .filter((profile) => profile.definition.programCode === programCode && profile.definition.phase === phase)
+    .sort((left, right) => right.version - left.version)[0];
 }

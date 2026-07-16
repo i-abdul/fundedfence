@@ -49,22 +49,26 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 7. Idle sessions expire on the server, and active duplicated tabs share session activity without unexpected re-login.
 8. The landing page has no horizontal overflow at phone widths and core product text is readable at 100% browser zoom.
 
-## Sprint 2 — versioned FundedNext rule profiles
+## Sprint 2 — versioned FundedNext rule profiles (complete and deployed)
 
-- Model firm, program, phase, account-size applicability, platform, and effective dates.
-- Capture official sources and evidence snapshots.
-- Add draft, validation, independent approval, activation, supersession, and rollback workflow.
-- Implement FundedNext Stellar 2-Step, Stellar 1-Step, Stellar Lite, and Stellar Instant as separately versioned profiles.
-- Support daily/static/trailing loss basis, reset timezone, profit targets, trading-day requirements, holding/news restrictions, inactivity, and payout eligibility inputs.
-- Recalculate affected accounts when a new version becomes effective without mutating historical results.
+- [x] Model firm, program, phase, account-size applicability, platform, and effective dates.
+- [x] Capture official sources and hash-tracked evidence snapshots.
+- [x] Add draft, validation, independent approval, activation, supersession, and rollback workflow.
+- [x] Implement FundedNext Stellar 2-Step, Stellar 1-Step, Stellar Lite, and Stellar Instant as separately versioned profiles.
+- [x] Add a separately sourced Free Trial profile for the connected 15K test account; preserve the official EA prohibition as an operational warning.
+- [x] Support daily/static/trailing loss basis, reset timezone, profit targets, trading-day requirements, holding/news restrictions, inactivity, and payout eligibility inputs.
+- [x] Recalculate affected connected accounts when a new version becomes effective without mutating historical results.
 
-## Sprint 3 — drawdown and consistency guardians
+## Sprint 3 — drawdown and consistency guardians (implementation complete; deployment pending)
 
-- Add intraday equity/balance, end-of-day equity/balance, static, hybrid, until-initial, and throughout-account trailing models.
-- Record start-of-day and high-watermark state across broker/server timezone boundaries.
-- Simulate all stops reached, gap reserve, next reset, position close, and withdrawal effects.
-- Add best-day, profitable-day, trade-count, lot/risk consistency, and payout-period calculations.
-- Persist every input, intermediate value, engine version, and explanation for replay.
+- [x] Add intraday equity/balance, end-of-day equity/balance, static, hybrid, until-initial, and throughout-account trailing models.
+- [x] Record start-of-day and high-watermark state across broker/server timezone boundaries.
+- [x] Simulate all stops reached, gap reserve, next reset, position close, and withdrawal effects.
+- [x] Add best-day, profitable-day, trade-count, lot consistency, and caller-defined payout-period calculations; unsupported risk consistency stays explicitly unknown.
+- [x] Persist normalized source inputs, immutable snapshot/rule/engine calculation records, intermediate values, outputs, and versioned explanations for replay.
+- [x] Replace live-dashboard placeholders with calculated buffers, effective floors, model status, consistency observations, and all-stops scenarios.
+- [ ] Apply the PostgreSQL migration and pass the isolated OCI lifecycle test.
+- [ ] Classify the existing 15K workspace as Free Trial, have the authorized owner approve/activate that profile, and verify the first live calculation.
 
 ## Sprint 4 — daily risk command centre
 

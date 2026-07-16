@@ -60,6 +60,8 @@ export function RuleProfilesView({ profiles, canAdmin }: { profiles: RuleProfile
                   <div><dt>Daily reset</dt><dd>{rule.dailyLoss ? "00:00 broker time" : "Not applicable"}</dd></div>
                   <div><dt>Overnight / weekend</dt><dd>{rule.holding.overnight} / {rule.holding.weekend}</dd></div>
                   <div><dt>News trading</dt><dd>{rule.news.mode === "allowed" ? "Allowed" : `${percent(rule.news.qualifyingProfitBps)} qualifying profit in ±${rule.news.windowMinutesBefore} min`}</dd></div>
+                  {rule.maximumOpenPositions != null && <div><dt>Maximum open positions</dt><dd>{rule.maximumOpenPositions}</dd></div>}
+                  {rule.expertAdvisors && <div><dt>Expert advisors</dt><dd>{humanize(rule.expertAdvisors.mode)}</dd></div>}
                 </dl>
                 <div className="rule-source-list">
                   <strong>{version.sources.length} official source{version.sources.length === 1 ? "" : "s"}</strong>
@@ -71,6 +73,7 @@ export function RuleProfilesView({ profiles, canAdmin }: { profiles: RuleProfile
                 <div>
                   <strong>Interpretation</strong>
                   {rule.interpretationNotes.map((note) => <p key={note}>{note}</p>)}
+                  {rule.expertAdvisors?.note && <p>{rule.expertAdvisors.note}</p>}
                   <strong>Still needs a separate official source</strong>
                   <p>{rule.unknownInputs.join(" · ")}</p>
                   <strong>Version history</strong>

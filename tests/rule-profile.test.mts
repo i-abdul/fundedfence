@@ -4,7 +4,8 @@ import { canTransitionRule, validateRuleDefinition } from "../lib/domain/rule-pr
 import { fundedNextRuleProfiles } from "../lib/product/fundednext-rule-catalog.ts";
 
 test("all FundedNext phase profiles satisfy the versioned rule contract", () => {
-  assert.equal(fundedNextRuleProfiles.length, 9);
+  assert.equal(fundedNextRuleProfiles.length, 11);
+  assert.equal(new Set(fundedNextRuleProfiles.map((profile) => profile.ruleSetId)).size, 10);
   const versionIds = new Set<string>();
   for (const profile of fundedNextRuleProfiles) {
     const validated = validateRuleDefinition(profile.definition);
@@ -14,6 +15,15 @@ test("all FundedNext phase profiles satisfy the versioned rule contract", () => 
     assert.ok(!versionIds.has(profile.versionId));
     versionIds.add(profile.versionId);
   }
+  const trial = fundedNextRuleProfiles.find((profile) => profile.definition.programCode === "fundednext-free-trial");
+  assert.ok(trial);
+  assert.equal(trial.definition.profitTargetBps, 500);
+  assert.equal(trial.definition.minimumTradingDays, 3);
+  assert.equal(trial.definition.maximumTradingDays, 14);
+  assert.equal(trial.definition.expertAdvisors?.mode, "prohibited");
+  assert.equal(trial.definition.maximumOpenPositions, 30);
+  const instant = fundedNextRuleProfiles.find((profile) => profile.definition.programCode === "fundednext-stellar-instant" && profile.version === 2);
+  assert.equal(instant?.definition.maximumLoss.trailingBasis, "balance");
 });
 
 test("rule lifecycle cannot skip independent review or activation", () => {

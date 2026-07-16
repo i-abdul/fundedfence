@@ -179,6 +179,43 @@ export const accountSnapshots = sqliteTable("account_snapshots", {
   ...timestamps,
 }, (table) => [uniqueIndex("snapshots_device_sequence_unique").on(table.connectorDeviceId, table.sequence), index("snapshots_account_observed_idx").on(table.tradingAccountId, table.observedAt)]);
 
+export const accountRiskStates = sqliteTable("account_risk_states", {
+  tradingAccountId: text("trading_account_id").primaryKey().references(() => tradingAccounts.id),
+  ruleVersionId: text("rule_version_id").notNull().references(() => ruleVersions.id),
+  resetKey: text("reset_key").notNull(),
+  initialBalanceMinor: text("initial_balance_minor").notNull(),
+  startOfDayBalanceMinor: text("start_of_day_balance_minor").notNull(),
+  startOfDayEquityMinor: text("start_of_day_equity_minor").notNull(),
+  highestBalanceMinor: text("highest_balance_minor").notNull(),
+  highestEquityMinor: text("highest_equity_minor").notNull(),
+  endOfDayHighestBalanceMinor: text("end_of_day_highest_balance_minor").notNull(),
+  endOfDayHighestEquityMinor: text("end_of_day_highest_equity_minor").notNull(),
+  latestBalanceMinor: text("latest_balance_minor").notNull(),
+  latestEquityMinor: text("latest_equity_minor").notNull(),
+  lastSnapshotId: text("last_snapshot_id").notNull().references(() => accountSnapshots.id),
+  stateVersion: integer("state_version").notNull().default(1),
+  ...timestamps,
+}, (table) => [index("risk_states_rule_reset_idx").on(table.ruleVersionId, table.resetKey)]);
+
+export const riskCalculations = sqliteTable("risk_calculations", {
+  id: text("id").primaryKey(),
+  tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
+  accountSnapshotId: text("account_snapshot_id").notNull().references(() => accountSnapshots.id),
+  ruleVersionId: text("rule_version_id").notNull().references(() => ruleVersions.id),
+  engineVersion: text("engine_version").notNull(),
+  explanationVersion: text("explanation_version").notNull(),
+  status: text("status").notNull(),
+  inputJson: text("input_json").notNull(),
+  intermediateJson: text("intermediate_json").notNull(),
+  outputJson: text("output_json").notNull(),
+  explanationJson: text("explanation_json").notNull(),
+  calculatedAt: text("calculated_at").notNull(),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("risk_calculations_snapshot_rule_engine_unique").on(table.accountSnapshotId, table.ruleVersionId, table.engineVersion),
+  index("risk_calculations_account_time_idx").on(table.tradingAccountId, table.calculatedAt),
+]);
+
 export const positions = sqliteTable("positions", {
   id: text("id").primaryKey(),
   tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),

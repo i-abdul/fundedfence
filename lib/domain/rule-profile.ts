@@ -15,6 +15,7 @@ export type LossRule = {
   limitBps: number;
   model: "static" | "trailing-until-initial";
   breachBasis: "equity" | "balance-or-equity";
+  trailingBasis?: "balance" | "equity";
   reference: "initial-balance";
   cadence: "intraday";
   includes: Array<"closed-pnl" | "floating-pnl" | "commission" | "swap" | "fees">;
@@ -54,6 +55,8 @@ export type RuleDefinition = {
   };
   consistency: { mode: "none" | "unknown" };
   copyTrading: { mode: "same-owner-only" | "unknown" };
+  expertAdvisors?: { mode: "allowed" | "prohibited" | "unknown"; note: string };
+  maximumOpenPositions?: number | null;
   inactivityDays: number | null;
   payoutEligibility: { status: "not-applicable" | "requires-separate-profile" | "unknown" };
   interpretationNotes: string[];
@@ -79,6 +82,8 @@ export function validateRuleDefinition(value: unknown): RuleDefinition {
   if (rule.dailyLoss !== null) validateLoss(rule.dailyLoss, true);
   validateLoss(rule.maximumLoss, false);
   if (!rule.holding || !rule.news || !rule.consistency || !rule.copyTrading || !rule.payoutEligibility) throw new Error("Rule restriction metadata is incomplete.");
+  if (rule.expertAdvisors && !["allowed", "prohibited", "unknown"].includes(rule.expertAdvisors.mode)) throw new Error("Expert-advisor rule metadata is invalid.");
+  if (rule.maximumOpenPositions !== undefined && rule.maximumOpenPositions !== null && (!Number.isInteger(rule.maximumOpenPositions) || rule.maximumOpenPositions < 1)) throw new Error("Maximum open positions are invalid.");
   if (!Array.isArray(rule.interpretationNotes) || !Array.isArray(rule.unknownInputs)) throw new Error("Rule interpretation metadata is invalid.");
   return rule as RuleDefinition;
 }
@@ -105,6 +110,7 @@ function validateLoss(value: unknown, daily: boolean): asserts value is LossRule
   optionalBps(loss.limitBps, "loss limit", false);
   if (!["static", "trailing-until-initial"].includes(String(loss.model))) throw new Error("Loss model is invalid.");
   if (!["equity", "balance-or-equity"].includes(String(loss.breachBasis)) || loss.reference !== "initial-balance" || loss.cadence !== "intraday") throw new Error("Loss calculation basis is invalid.");
+  if (loss.trailingBasis !== undefined && !["balance", "equity"].includes(loss.trailingBasis)) throw new Error("Trailing high-water basis is invalid.");
   if (!Array.isArray(loss.includes) || loss.includes.length === 0) throw new Error("Loss inclusions are required.");
   if (daily && (!loss.reset || loss.reset.at !== "00:00" || loss.reset.timezone !== "broker-server")) throw new Error("Daily reset definition is invalid.");
 }

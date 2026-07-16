@@ -11,9 +11,11 @@ type DashboardLiveState = {
     account_size_minor?: string;
     currency?: string;
     status?: string;
+    rule_version_id?: string | null;
     state?: string | null;
     last_heartbeat_at?: string | null;
     last_snapshot_at?: string | null;
+    risk_calculated_at?: string | null;
   };
   snapshot?: {
     observed_at?: string;
@@ -46,7 +48,62 @@ type DashboardLiveState = {
     positions_without_metadata: number;
     all_positions_covered: boolean;
   };
+  riskCalculation?: {
+    id: string;
+    ruleVersionId: string;
+    status: GuardianStatus;
+    engineVersion: string;
+    explanationVersion: string;
+    calculatedAt: string;
+    output: { guardian?: GuardianOutput; consistency?: ConsistencyOutput };
+    explanations: string[];
+  } | null;
   dataFreshness?: "live" | "delayed" | "offline";
+};
+
+type GuardianStatus = "healthy" | "caution" | "critical" | "breached";
+
+type GuardianScenario = {
+  availability: "calculated" | "unknown" | "not-requested";
+  projectedBalanceMinor: string | null;
+  projectedEquityMinor: string | null;
+  remainingDailyBufferMinor: string | null;
+  remainingTotalBufferMinor: string | null;
+  breached: boolean | null;
+  reason: string;
+};
+
+type GuardianOutput = {
+  dailyFloorMinor: string | null;
+  staticTotalFloorMinor: string;
+  trailingTotalFloorMinor: string | null;
+  effectiveTotalFloorMinor: string;
+  currentDailyReferenceMinor: string | null;
+  currentTotalReferenceMinor: string;
+  remainingDailyBufferMinor: string | null;
+  remainingTotalBufferMinor: string;
+  closestBufferMinor: string;
+  safeAdditionalRiskMinor: string;
+  status: GuardianStatus;
+  scenarios: {
+    allStopsReached: GuardianScenario;
+    nextReset: GuardianScenario;
+    closePositionsNow: GuardianScenario;
+    withdrawal: GuardianScenario;
+  };
+};
+
+type ConsistencyOutput = {
+  totalNetProfitMinor: string;
+  bestDayProfitMinor: string;
+  bestDayShareBps: number | null;
+  profitableDayCount: number;
+  tradingDayCount: number;
+  closedTradeCount: number;
+  largestClosedVolumeUnits: string;
+  averageClosedVolumeUnits: string | null;
+  largestToAverageVolumeBps: number | null;
+  riskConsistencyStatus: "unknown";
 };
 
 type AccountListItem = {
@@ -68,6 +125,10 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
   const freshness = liveState?.dataFreshness ?? "offline";
   const livePositions = liveState?.positions ?? [];
   const riskSummary = liveState?.riskSummary;
+  const riskCalculation = liveState?.riskCalculation ?? null;
+  const guardian = riskCalculation?.output.guardian;
+  const consistency = riskCalculation?.output.consistency;
+  const riskActive = Boolean(guardian);
 
   return (
     <main className="dashboard-shell">
@@ -75,7 +136,9 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
         <span className="demo-dot" />
         {liveMode
           ? liveSnapshot
-            ? "Live MT5 balances, positions, and stop risk are shown. Firm rule limits remain disabled until their profiles are approved."
+            ? riskActive
+              ? `Live MT5 data is protected by an immutable rule calculation from engine ${riskCalculation?.engineVersion}.`
+              : "Live MT5 balances, positions, and stop risk are shown. Firm rule limits remain disabled until the selected profile is approved and activated."
             : freshness === "offline"
               ? "Live protection is paused because the connector has not supplied a current snapshot."
               : "The MT5 account is paired and FundedFence is waiting for its first snapshot."
@@ -102,23 +165,28 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
       </section>
 
       <section className="health-grid">
-        {liveMode ? <PendingHealth snapshotReady={Boolean(liveSnapshot)} openPositionCount={livePositions.length} riskSummary={riskSummary} currency={currency} /> : <DemoHealth />}
+        {liveMode ? guardian ? <LiveHealth guardian={guardian} openPositionCount={livePositions.length} riskSummary={riskSummary} currency={currency} /> : <PendingHealth snapshotReady={Boolean(liveSnapshot)} openPositionCount={livePositions.length} riskSummary={riskSummary} currency={currency} /> : <DemoHealth />}
 
         <article className="panel balance-panel">
           <div className="panel-heading"><div><p className="eyebrow">Current state</p><h2>{liveMode ? `${formatMoney(liveAccount?.account_size_minor, currency)} account` : `${demoAccount.accountSize} account`}</h2></div><button className="kebab" aria-label="Account options">···</button></div>
           <div className="balance-values"><span><small>Balance</small><strong>{liveMode ? formatMoney(liveSnapshot?.balance_minor, currency) : demoAccount.balance}</strong></span><span><small>Equity</small><strong>{liveMode ? formatMoney(liveSnapshot?.equity_minor, currency) : demoAccount.equity}</strong></span></div>
           {liveMode
-            ? <div className="profit-progress"><div><span>Rule calculation</span><strong><small>Awaiting approved profile</small></strong></div><div className="progress-track"><span style={{ width: "0%" }} /></div><p><span>{liveSnapshot ? `Snapshot ${formatTimestamp(liveSnapshot.observed_at)}` : "No snapshot received"}</span><span>{freshnessLabel(freshness)}</span></p></div>
+            ? <div className="profit-progress"><div><span>Rule calculation</span><strong><small>{riskCalculation ? `Engine ${riskCalculation.engineVersion}` : "Awaiting effective profile"}</small></strong></div><div className="progress-track"><span style={{ width: riskCalculation ? "100%" : "0%" }} /></div><p><span>{riskCalculation ? `Calculated ${formatTimestamp(riskCalculation.calculatedAt)}` : liveSnapshot ? `Snapshot ${formatTimestamp(liveSnapshot.observed_at)}` : "No snapshot received"}</span><span>{freshnessLabel(freshness)}</span></p></div>
             : <div className="profit-progress"><div><span>Profit target</span><strong>{demoAccount.profit} <small>of +$8,000</small></strong></div><div className="progress-track"><span style={{ width: `${demoAccount.profitProgress}%` }} /></div><p><span>{demoAccount.profitProgress}% complete</span><span>$4,760 remaining</span></p></div>}
         </article>
       </section>
 
       <section className="metric-grid" aria-label="Key risk metrics">
-        {liveMode ? <>
-          <Metric label="Daily drawdown" value="—" note="Rule profile required" tone="neutral" />
-          <Metric label="Total drawdown" value="—" note="Rule profile required" tone="neutral" />
-          <Metric label="Trailing floor" value="—" note="Model not verified" tone="neutral" />
-          <Metric label="Consistency" value="—" note="Trade history required" tone="neutral" />
+        {liveMode ? guardian ? <>
+          <Metric label="Daily buffer" value={formatMoney(guardian.remainingDailyBufferMinor, currency)} note={guardian.dailyFloorMinor === null ? "No daily-loss rule in this profile" : `Floor ${formatMoney(guardian.dailyFloorMinor, currency)}`} tone={guardianTone(guardian.status)} />
+          <Metric label="Total buffer" value={formatMoney(guardian.remainingTotalBufferMinor, currency)} note={`Floor ${formatMoney(guardian.effectiveTotalFloorMinor, currency)}`} tone={guardianTone(guardian.status)} />
+          <Metric label={guardian.trailingTotalFloorMinor === null ? "Static floor" : "Trailing floor"} value={formatMoney(guardian.effectiveTotalFloorMinor, currency)} note={guardian.trailingTotalFloorMinor === null ? "Fixed from initial balance" : "High-water state preserved"} tone="neutral" />
+          <Metric label="Best-day share" value={formatBps(consistency?.bestDayShareBps)} note={consistency ? `${consistency.tradingDayCount} trading days · ${consistency.closedTradeCount} closed trades` : "Waiting for normalized deal history"} tone="neutral" />
+        </> : <>
+          <Metric label="Daily buffer" value="—" note="Effective rule profile required" tone="neutral" />
+          <Metric label="Total buffer" value="—" note="Effective rule profile required" tone="neutral" />
+          <Metric label="Loss floor" value="—" note="Model not active" tone="neutral" />
+          <Metric label="Consistency" value="—" note="Calculation not active" tone="neutral" />
         </> : <>
           <Metric label="Daily drawdown" value="$4,630" note="92.6% available" tone="healthy" />
           <Metric label="Total drawdown" value="$7,630" note="76.3% available" tone="healthy" />
@@ -152,7 +220,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
               </div>
             ))}
           </div>
-          <div className="panel-footer">{liveMode ? <><span>Known risk at stops: <strong>{formatMoney(riskSummary?.known_risk_minor, currency)}</strong></span><span>Stop coverage: <strong>{riskCoverageLabel(livePositions.length, riskSummary)}</strong></span></> : <><span>Projected equity at all stops: <strong>$100,202</strong></span><span>Remaining buffer: <strong>$1,962</strong></span></>}</div>
+          <div className="panel-footer">{liveMode ? <><span>Known risk at stops: <strong>{formatMoney(riskSummary?.known_risk_minor, currency)}</strong></span><span>{guardian?.scenarios.allStopsReached.availability === "calculated" ? <>All-stops buffer: <strong>{formatClosestScenarioBuffer(guardian.scenarios.allStopsReached, currency)}</strong></> : <>Stop coverage: <strong>{riskCoverageLabel(livePositions.length, riskSummary)}</strong></>}</span></> : <><span>Projected equity at all stops: <strong>$100,202</strong></span><span>Remaining buffer: <strong>$1,962</strong></span></>}</div>
         </article>
 
         <article className="panel daily-plan" id="simulator">
@@ -173,7 +241,9 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
         <div className="panel-heading"><div><p className="eyebrow">Rules engine</p><h2>Rule status</h2></div><Link className="quiet-link" href="/rules">View calculations →</Link></div>
         <div className="rule-grid">
           {liveMode
-            ? ["Daily drawdown", "Maximum drawdown", "Trailing model", "Consistency"].map((name) => <div className="rule-card" key={name}><span className="rule-state neutral" /><div><small>{name}</small><strong>—</strong></div><p>Versioned profile<br /><span>Awaiting verification</span></p><em className="neutral">Pending</em></div>)
+            ? guardian
+              ? <LiveRuleCards guardian={guardian} consistency={consistency} currency={currency} />
+              : ["Daily drawdown", "Maximum drawdown", "Trailing model", "Consistency"].map((name) => <div className="rule-card" key={name}><span className="rule-state neutral" /><div><small>{name}</small><strong>—</strong></div><p>Versioned profile<br /><span>Awaiting activation</span></p><em className="neutral">Pending</em></div>)
             : ruleRows.map((rule) => <div className="rule-card" key={rule.name}><span className={`rule-state ${rule.tone}`} /><div><small>{rule.name}</small><strong>{rule.buffer}</strong></div><p>{rule.current}<br /><span>{rule.limit}</span></p><em className={rule.tone}>{rule.status}</em></div>)}
         </div>
       </section>
@@ -182,7 +252,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
         <article className="panel timeline-panel"><div className="panel-heading"><div><p className="eyebrow">Audit trail</p><h2>Account timeline</h2></div><span className="panel-count">Today</span></div><div className="timeline-list">{liveMode ? <><Timeline time={formatTimelineTime(liveAccount?.last_heartbeat_at)} title={`Connector ${freshnessLabel(freshness).toLowerCase()}`} detail={liveAccount?.last_heartbeat_at ? `Last heartbeat ${heartbeatLabel(liveAccount.last_heartbeat_at)}` : "No heartbeat has been received"} tone={freshness === "live" ? "healthy" : "caution"} /><Timeline time={formatTimelineTime(liveSnapshot?.observed_at)} title={liveSnapshot ? "Account snapshot received" : "Waiting for first snapshot"} detail={liveSnapshot ? `Balance and equity observed at ${formatTimestamp(liveSnapshot.observed_at)}` : "Keep MT5 and the EA running"} tone={liveSnapshot ? "healthy" : "caution"} /></> : <><Timeline time="14:32" title="Risk state recalculated" detail="Snapshot sequence 8,214 · all rule buffers healthy" tone="healthy" /><Timeline time="14:29" title="Stop-loss changed" detail="EURUSD stop moved to 1.08180 · risk reduced by $240" tone="neutral" /><Timeline time="14:17" title="News caution window" detail="Illustrative event restriction begins in 13 minutes" tone="caution" /><Timeline time="13:58" title="Connector heartbeat" detail="Round-trip 184 ms · sequence continuous" tone="healthy" /></>}</div></article>
         <article className="panel protection-panel"><span className="protection-mark">✓</span><p className="eyebrow">Read-only by design</p><h2>Your terminal stays in control.</h2><p>The connector observes account data and sends signed events. It contains no order placement, modification, or closing calls.</p><Link className="quiet-link" href="/pairing">Review connector setup →</Link></article>
       </section>
-      <footer className="product-footer"><span>FundedFence provides risk-monitoring tools, not financial advice or a guarantee of challenge success.</span><span>{liveMode ? "Live telemetry and stop risk are active; firm rule outputs remain disabled." : "Data shown here is illustrative."}</span></footer>
+      <footer className="product-footer"><span>FundedFence provides risk-monitoring tools, not financial advice or a guarantee of challenge success.</span><span>{liveMode ? riskActive ? `Live telemetry and rule engine ${riskCalculation?.engineVersion} are active.` : "Live telemetry is active; firm rule outputs remain disabled." : "Data shown here is illustrative."}</span></footer>
     </main>
   );
 }
@@ -200,6 +270,29 @@ function DemoHealth() {
             <span><small>Total buffer</small><strong>$7,630</strong></span>
             <span><small>Open risk</small><strong>$2,668</strong></span>
             <span><small>Safe additional risk</small><strong>$4,230</strong></span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function LiveHealth({ guardian, openPositionCount, riskSummary, currency }: { guardian: GuardianOutput; openPositionCount: number; riskSummary: DashboardLiveState["riskSummary"]; currency: string }) {
+  const tone = guardianTone(guardian.status);
+  const title = guardian.status === "healthy" ? "Within sourced loss limits" : guardian.status === "caution" ? "Risk buffer is narrowing" : guardian.status === "critical" ? "Very close to a loss limit" : "Loss limit breached";
+  const closest = guardian.remainingDailyBufferMinor === null || BigInt(guardian.remainingTotalBufferMinor) < BigInt(guardian.remainingDailyBufferMinor) ? "maximum loss" : "daily loss";
+  return (
+    <article className="panel health-panel">
+      <div className="panel-heading"><div><p className="eyebrow">Account health</p><h2>{title}</h2></div><span className={`status-pill ${tone}`}>{statusLabel(guardian.status)}</span></div>
+      <div className="health-content">
+        <div className={`risk-ring ${guardian.status === "healthy" ? "" : "pending"}`} aria-label={`Live rule status ${guardian.status}`}><div><strong>{guardian.status === "healthy" ? "OK" : "!"}</strong><span>LIVE</span><small>RULE STATUS</small></div></div>
+        <div className="health-copy">
+          <p>The closest sourced constraint is {closest}. Values come from the current MT5 snapshot and the effective immutable rule version.</p>
+          <div className="health-metrics">
+            <span><small>Daily buffer</small><strong>{guardian.remainingDailyBufferMinor === null ? "Not applicable" : formatMoney(guardian.remainingDailyBufferMinor, currency)}</strong></span>
+            <span><small>Total buffer</small><strong>{formatMoney(guardian.remainingTotalBufferMinor, currency)}</strong></span>
+            <span><small>Open risk</small><strong>{openRiskLabel(openPositionCount, riskSummary, currency)}</strong></span>
+            <span><small>Safe additional risk</small><strong>{formatMoney(guardian.safeAdditionalRiskMinor, currency)}</strong></span>
           </div>
         </div>
       </div>
@@ -225,6 +318,17 @@ function PendingHealth({ snapshotReady, openPositionCount, riskSummary, currency
       </div>
     </article>
   );
+}
+
+function LiveRuleCards({ guardian, consistency, currency }: { guardian: GuardianOutput; consistency: ConsistencyOutput | undefined; currency: string }) {
+  const tone = guardianTone(guardian.status);
+  const cards = [
+    { name: "Daily drawdown", value: guardian.remainingDailyBufferMinor === null ? "N/A" : formatMoney(guardian.remainingDailyBufferMinor, currency), current: guardian.currentDailyReferenceMinor === null ? "No daily rule" : `Reference ${formatMoney(guardian.currentDailyReferenceMinor, currency)}`, limit: guardian.dailyFloorMinor === null ? "Not applicable" : `Floor ${formatMoney(guardian.dailyFloorMinor, currency)}`, status: guardian.dailyFloorMinor === null ? "N/A" : statusLabel(guardian.status), tone: guardian.dailyFloorMinor === null ? "neutral" : tone },
+    { name: "Maximum drawdown", value: formatMoney(guardian.remainingTotalBufferMinor, currency), current: `Reference ${formatMoney(guardian.currentTotalReferenceMinor, currency)}`, limit: `Floor ${formatMoney(guardian.effectiveTotalFloorMinor, currency)}`, status: statusLabel(guardian.status), tone },
+    { name: "Loss model", value: guardian.trailingTotalFloorMinor === null ? "Static" : "Trailing", current: `Effective ${formatMoney(guardian.effectiveTotalFloorMinor, currency)}`, limit: guardian.trailingTotalFloorMinor === null ? "Fixed initial-balance floor" : "High-water state preserved", status: "Active", tone: "neutral" },
+    { name: "Consistency", value: formatBps(consistency?.bestDayShareBps), current: consistency ? `${consistency.tradingDayCount} trading days` : "No normalized history", limit: "Observed metric · no assumed limit", status: consistency ? "Observed" : "Pending", tone: "neutral" },
+  ];
+  return <>{cards.map((card) => <div className="rule-card" key={card.name}><span className={`rule-state ${card.tone}`} /><div><small>{card.name}</small><strong>{card.value}</strong></div><p>{card.current}<br /><span>{card.limit}</span></p><em className={card.tone}>{card.status}</em></div>)}</>;
 }
 
 function useLiveAccount(): { liveState: DashboardLiveState | null; loading: boolean; accounts: AccountListItem[]; selectedAccountId: string | null; selectAccount: (accountId: string) => void } {
@@ -300,8 +404,8 @@ function useLiveAccount(): { liveState: DashboardLiveState | null; loading: bool
   return { liveState, loading, accounts, selectedAccountId: accountId, selectAccount };
 }
 
-function formatMoney(value: string | undefined, currency: string): string {
-  if (value === undefined || !/^-?\d+$/.test(value)) return "—";
+function formatMoney(value: string | null | undefined, currency: string): string {
+  if (value == null || !/^-?\d+$/.test(value)) return "—";
   const minor = BigInt(value);
   const negative = minor < 0n;
   const absolute = negative ? -minor : minor;
@@ -309,6 +413,25 @@ function formatMoney(value: string | undefined, currency: string): string {
   const fraction = (absolute % 100n).toString().padStart(2, "0");
   const number = `${negative ? "-" : ""}${major.toLocaleString("en-US")}.${fraction}`;
   return `${currency === "USD" ? "$" : `${currency} `}${number}`;
+}
+
+function formatBps(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return "—";
+  return `${(value / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
+}
+
+function guardianTone(status: GuardianStatus): "healthy" | "caution" {
+  return status === "healthy" ? "healthy" : "caution";
+}
+
+function statusLabel(status: GuardianStatus): string {
+  return status[0].toUpperCase() + status.slice(1);
+}
+
+function formatClosestScenarioBuffer(scenario: GuardianScenario, currency: string): string {
+  const values = [scenario.remainingDailyBufferMinor, scenario.remainingTotalBufferMinor].filter((value): value is string => value !== null && /^-?\d+$/.test(value));
+  if (!values.length) return "Unknown";
+  return formatMoney(values.reduce((smallest, value) => BigInt(value) < BigInt(smallest) ? value : smallest), currency);
 }
 
 function freshnessLabel(freshness: "live" | "delayed" | "offline"): string {

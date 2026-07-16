@@ -238,6 +238,46 @@ CREATE TABLE IF NOT EXISTS account_snapshots (
 
 CREATE INDEX IF NOT EXISTS snapshots_account_observed_idx ON account_snapshots (trading_account_id, observed_at);
 
+CREATE TABLE IF NOT EXISTS account_risk_states (
+  trading_account_id text PRIMARY KEY REFERENCES trading_accounts(id),
+  rule_version_id text NOT NULL REFERENCES rule_versions(id),
+  reset_key text NOT NULL,
+  initial_balance_minor text NOT NULL,
+  start_of_day_balance_minor text NOT NULL,
+  start_of_day_equity_minor text NOT NULL,
+  highest_balance_minor text NOT NULL,
+  highest_equity_minor text NOT NULL,
+  end_of_day_highest_balance_minor text NOT NULL,
+  end_of_day_highest_equity_minor text NOT NULL,
+  latest_balance_minor text NOT NULL,
+  latest_equity_minor text NOT NULL,
+  last_snapshot_id text NOT NULL REFERENCES account_snapshots(id),
+  state_version integer NOT NULL DEFAULT 1,
+  created_at text NOT NULL,
+  updated_at text NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS risk_states_rule_reset_idx ON account_risk_states (rule_version_id, reset_key);
+
+CREATE TABLE IF NOT EXISTS risk_calculations (
+  id text PRIMARY KEY,
+  trading_account_id text NOT NULL REFERENCES trading_accounts(id),
+  account_snapshot_id text NOT NULL REFERENCES account_snapshots(id),
+  rule_version_id text NOT NULL REFERENCES rule_versions(id),
+  engine_version text NOT NULL,
+  explanation_version text NOT NULL,
+  status text NOT NULL,
+  input_json text NOT NULL,
+  intermediate_json text NOT NULL,
+  output_json text NOT NULL,
+  explanation_json text NOT NULL,
+  calculated_at text NOT NULL,
+  created_at text NOT NULL,
+  UNIQUE (account_snapshot_id, rule_version_id, engine_version)
+);
+
+CREATE INDEX IF NOT EXISTS risk_calculations_account_time_idx ON risk_calculations (trading_account_id, calculated_at);
+
 CREATE TABLE IF NOT EXISTS positions (
   id text PRIMARY KEY,
   trading_account_id text NOT NULL REFERENCES trading_accounts(id),

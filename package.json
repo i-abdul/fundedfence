@@ -9,7 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "node --test tests/drawdown.test.mts tests/position-risk.test.mts tests/pairing.test.mts tests/connector-protocol.test.mts tests/rule-profile.test.mts",
+    "test": "node --test tests/drawdown.test.mts tests/position-risk.test.mts tests/pairing.test.mts tests/connector-protocol.test.mts tests/rule-profile.test.mts tests/risk-guardian.test.mts tests/consistency.test.mts",
     "test:integration": "node --test tests/rendered-html.test.mjs",
     "test:postgres": "node --test tests/postgres-lifecycle.test.mjs",
     "typecheck": "tsc --noEmit",

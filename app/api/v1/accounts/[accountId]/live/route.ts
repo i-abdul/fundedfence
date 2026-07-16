@@ -2,6 +2,7 @@ import { getAppUser } from "@/lib/server/auth";
 import { calculatePositionRisk } from "@/lib/domain/position-risk";
 import { jsonError } from "@/lib/server/http";
 import { requireDatabase } from "@/lib/server/runtime";
+import { latestRiskCalculation } from "@/lib/server/risk-engine";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
     const { accountId } = await context.params;
     if (!/^acct_[a-f0-9]{32}$/.test(accountId)) return jsonError(400, "account_id_invalid", "The account identifier is invalid.", correlationId);
     const database = await requireDatabase();
-    const account = await database.prepare("SELECT ta.id, ta.label, ta.account_size_minor, ta.currency, ta.status, ac.state, ac.last_heartbeat_at, ac.last_snapshot_at, ac.last_trade_event_at, ac.connector_version FROM trading_accounts ta JOIN users u ON u.id = ta.owner_user_id LEFT JOIN account_connections ac ON ac.trading_account_id = ta.id WHERE ta.id = ? AND u.email = ? LIMIT 1")
+    const account = await database.prepare("SELECT ta.id, ta.label, ta.account_size_minor, ta.currency, ta.status, ta.rule_version_id, ac.state, ac.last_heartbeat_at, ac.last_snapshot_at, ac.last_trade_event_at, ac.connector_version, ac.risk_calculated_at FROM trading_accounts ta JOIN users u ON u.id = ta.owner_user_id LEFT JOIN account_connections ac ON ac.trading_account_id = ta.id WHERE ta.id = ? AND u.email = ? LIMIT 1")
       .bind(accountId, user.email.toLowerCase()).first<Record<string, unknown>>();
     if (!account) return jsonError(404, "account_not_found", "The account was not found.", correlationId);
     const snapshot = await database.prepare("SELECT observed_at, balance_minor, equity_minor, margin_minor, free_margin_minor, floating_pnl_minor, server_time FROM account_snapshots WHERE trading_account_id = ? ORDER BY sequence DESC LIMIT 1")
@@ -48,6 +49,7 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
     const positionsWithoutStop = positions.filter((position) => position.stop_loss_price_points === null).length;
     const positionsWithoutMetadata = positions.filter((position) => position.stop_loss_price_points !== null && position.risk_at_stop_minor === null).length;
     const knownRiskMinor = positions.reduce((total, position) => total + (position.risk_at_stop_minor === null ? 0n : BigInt(position.risk_at_stop_minor)), 0n);
+    const riskCalculation = await latestRiskCalculation(database, accountId);
     return Response.json(
       {
         account,
@@ -61,6 +63,7 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
           positions_without_metadata: positionsWithoutMetadata,
           all_positions_covered: positionsWithoutStop === 0 && positionsWithoutMetadata === 0,
         },
+        riskCalculation,
         dataFreshness: freshness(account.last_heartbeat_at),
       },
       { headers: { "Cache-Control": "no-store" } },

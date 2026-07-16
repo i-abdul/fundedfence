@@ -154,6 +154,32 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
     pendingOrders: [pendingOrderPayload("3001")],
   }));
   assert.equal(firstReconciliation.status, 202);
+  const firstRiskState = await testPool.query("SELECT rule_version_id, reset_key, initial_balance_minor, state_version FROM account_risk_states WHERE trading_account_id = $1", [paired.accountId]);
+  assert.equal(firstRiskState.rows[0].rule_version_id, ruleVersionId);
+  assert.equal(firstRiskState.rows[0].initial_balance_minor, "10000000");
+  assert.equal(firstRiskState.rows[0].state_version, 1);
+  const firstRiskCalculation = await testPool.query("SELECT engine_version, status, input_json, intermediate_json, output_json, explanation_json FROM risk_calculations WHERE trading_account_id = $1 ORDER BY calculated_at DESC LIMIT 1", [paired.accountId]);
+  assert.equal(firstRiskCalculation.rows[0].engine_version, "1.0.0");
+  assert.equal(firstRiskCalculation.rows[0].status, "healthy");
+  const firstRiskOutput = JSON.parse(firstRiskCalculation.rows[0].output_json);
+  assert.equal(firstRiskOutput.guardian.remainingDailyBufferMinor, "501250");
+  assert.equal(firstRiskOutput.guardian.remainingTotalBufferMinor, "1000000");
+  assert.equal(firstRiskOutput.guardian.scenarios.allStopsReached.breached, true);
+  assert.ok(JSON.parse(firstRiskCalculation.rows[0].input_json).guardian);
+  assert.ok(JSON.parse(firstRiskCalculation.rows[0].intermediate_json).resetKey);
+  assert.ok(JSON.parse(firstRiskCalculation.rows[0].explanation_json).length >= 2);
+  const liveRiskResponse = await api(worker, env, `/api/v1/accounts/${paired.accountId}/live`, { cookie: firstCookie });
+  assert.equal(liveRiskResponse.status, 200);
+  const liveRiskPayload = await liveRiskResponse.json();
+  assert.equal(liveRiskPayload.riskCalculation.engineVersion, "1.0.0");
+  assert.equal(liveRiskPayload.riskCalculation.ruleVersionId, ruleVersionId);
+  const simulation = await api(worker, env, `/api/v1/accounts/${paired.accountId}/simulate`, { method: "POST", cookie: firstCookie, body: { withdrawalMinor: "100000", gapReserveMinor: "5000" } });
+  assert.equal(simulation.status, 200);
+  const simulationPayload = await simulation.json();
+  assert.equal(simulationPayload.guardian.safeAdditionalRiskMinor, "496250");
+  assert.equal(simulationPayload.guardian.scenarios.withdrawal.availability, "calculated");
+  const isolatedSimulation = await api(worker, env, `/api/v1/accounts/${paired.accountId}/simulate`, { method: "POST", cookie: secondCookie, body: { withdrawalMinor: "100000" } });
+  assert.equal(isolatedSimulation.status, 404);
   const partialClose = await sendEnvelope(worker, env, replacementPair.accessToken, tradeEnvelope(replacementPair, 3));
   assert.equal(partialClose.status, 202);
   const secondReconciliation = await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 4, {
@@ -161,6 +187,19 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
     pendingOrders: [],
   }));
   assert.equal(secondReconciliation.status, 202);
+  const riskHistory = await testPool.query("SELECT output_json FROM risk_calculations WHERE trading_account_id = $1 ORDER BY calculated_at ASC", [paired.accountId]);
+  assert.equal(riskHistory.rowCount, 2);
+  const latestRiskOutput = JSON.parse(riskHistory.rows[1].output_json);
+  assert.equal(latestRiskOutput.consistency.closedTradeCount, 1);
+  assert.equal(latestRiskOutput.consistency.bestDayShareBps, 10000);
+  const payoutSimulation = await api(worker, env, `/api/v1/accounts/${paired.accountId}/simulate`, { method: "POST", cookie: firstCookie, body: { payoutPeriodStart: new Date(Date.now() - 86_400_000).toISOString(), payoutPeriodEnd: new Date(Date.now() + 86_400_000).toISOString() } });
+  assert.equal(payoutSimulation.status, 200);
+  const payoutPayload = await payoutSimulation.json();
+  assert.equal(payoutPayload.consistency.metrics.closedTradeCount, 1);
+  assert.ok(payoutPayload.consistency.period.startsAt);
+  const completedRecalculation = await testPool.query("SELECT status, completed_at FROM rule_recalculation_jobs WHERE trading_account_id = $1 AND to_rule_version_id = $2", [paired.accountId, ruleVersionId]);
+  assert.equal(completedRecalculation.rows[0].status, "completed");
+  assert.ok(completedRecalculation.rows[0].completed_at);
   const normalizedDeal = await testPool.query("SELECT position_ticket, entry_type, volume_units, profit_minor, commission_minor, swap_minor, fee_minor FROM deals WHERE trading_account_id = $1 AND ticket = '4001'", [paired.accountId]);
   assert.deepEqual(normalizedDeal.rows[0], { position_ticket: "2001", entry_type: 1, volume_units: "40000", profit_minor: "1250", commission_minor: "-240", swap_minor: "-35", fee_minor: "-10" });
   const normalizedPosition = await testPool.query("SELECT volume_units FROM positions WHERE trading_account_id = $1 AND ticket = '2001'", [paired.accountId]);

@@ -9,6 +9,7 @@ import { sha256Hex, stableId } from "@/lib/server/crypto";
 import type { AppDatabase, AppPreparedStatement } from "@/lib/server/database";
 import { isCanonicalMinorUnits, jsonError, readBearerToken } from "@/lib/server/http";
 import { requireDatabase, requireSecret } from "@/lib/server/runtime";
+import { buildRiskCalculationStatements } from "@/lib/server/risk-engine";
 
 type DeviceRow = {
   trading_account_id: string;
@@ -85,14 +86,16 @@ export async function POST(request: Request): Promise<Response> {
 
     if (envelope.eventType === "account.snapshot" || envelope.eventType === "reconciliation") {
       const account = parseSnapshotAccount(envelope.payload.account);
+      const snapshotId = `snap_${crypto.randomUUID().replace(/-/g, "")}`;
       statements.push(
         database.prepare("INSERT INTO account_snapshots (id, trading_account_id, connector_device_id, sequence, observed_at, balance_minor, equity_minor, margin_minor, free_margin_minor, floating_pnl_minor, server_time, raw_payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          .bind(`snap_${crypto.randomUUID().replace(/-/g, "")}`, claims.accountId, claims.deviceId, envelope.sequence, envelope.occurredAt, account.balanceMinor, account.equityMinor, account.marginMinor, account.freeMarginMinor, account.floatingPnlMinor, account.serverTime, JSON.stringify(envelope.payload), nowIso, nowIso),
+          .bind(snapshotId, claims.accountId, claims.deviceId, envelope.sequence, envelope.occurredAt, account.balanceMinor, account.equityMinor, account.marginMinor, account.freeMarginMinor, account.floatingPnlMinor, account.serverTime, JSON.stringify(envelope.payload), nowIso, nowIso),
         database.prepare("UPDATE account_connections SET state = 'live', last_heartbeat_at = ?, last_snapshot_at = ?, connector_version = COALESCE(connector_version, 'unknown'), updated_at = ? WHERE trading_account_id = ?")
           .bind(nowIso, envelope.occurredAt, nowIso, claims.accountId),
       );
       statements.push(...await positionStatements(database, claims.accountId, envelope.payload.positions, nowIso));
       statements.push(...await pendingOrderStatements(database, claims.accountId, envelope.payload.pendingOrders, nowIso));
+      statements.push(...await buildRiskCalculationStatements(database, { tradingAccountId: claims.accountId, snapshotId, snapshot: account, positions: envelope.payload.positions, calculatedAt: nowIso }));
     } else if (envelope.eventType === "heartbeat") {
       statements.push(database.prepare("UPDATE account_connections SET state = 'live', last_heartbeat_at = ?, updated_at = ? WHERE trading_account_id = ?")
         .bind(envelope.occurredAt, nowIso, claims.accountId));
