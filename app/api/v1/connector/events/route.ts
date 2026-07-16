@@ -12,6 +12,7 @@ import { requireDatabase, requireSecret } from "@/lib/server/runtime";
 type DeviceRow = {
   trading_account_id: string;
   organization_id: string;
+  hashed_login: string | null;
   last_sequence: number;
   revoked_at: string | null;
 };
@@ -45,10 +46,13 @@ export async function POST(request: Request): Promise<Response> {
 
     const database = await requireDatabase();
     const device = await database.prepare(
-      "SELECT cd.trading_account_id, ta.organization_id, cd.last_sequence, cd.revoked_at FROM connector_devices cd JOIN trading_accounts ta ON ta.id = cd.trading_account_id WHERE cd.id = ? LIMIT 1",
+      "SELECT cd.trading_account_id, ta.organization_id, ta.hashed_login, cd.last_sequence, cd.revoked_at FROM connector_devices cd JOIN trading_accounts ta ON ta.id = cd.trading_account_id WHERE cd.id = ? LIMIT 1",
     ).bind(claims.deviceId).first<DeviceRow>();
     if (!device || device.revoked_at || device.trading_account_id !== claims.accountId) {
       return jsonError(401, "connector_revoked", "This connector is unknown or revoked.", correlationId);
+    }
+    if (!device.hashed_login || envelope.terminalIdentityHash !== device.hashed_login) {
+      return jsonError(409, "terminal_identity_changed", "The MT5 login or broker server changed. Generate a new pairing code for this account.", correlationId);
     }
 
     const duplicate = await database.prepare("SELECT id FROM trade_events WHERE connector_device_id = ? AND idempotency_key = ? LIMIT 1")

@@ -6,9 +6,10 @@ const secret = "connector-secret-for-tests-only-123456";
 
 function envelope(overrides: Partial<ConnectorEnvelope> = {}): ConnectorEnvelope {
   return {
-    protocolVersion: "1.0",
+    protocolVersion: "1.1",
     connectorId: "dev_12345678",
     accountId: "acct_12345678",
+    terminalIdentityHash: "a".repeat(64),
     occurredAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     sentAt: new Date().toISOString(),
     sequence: 7,
@@ -36,10 +37,14 @@ test("signs the canonical envelope and detects tampering", async () => {
 });
 
 test("verifies raw connector JSON exactly as sent by MT5", async () => {
-  const rawEnvelope = `{"accountId":"acct_12345678","connectorId":"dev_12345678","eventType":"account.snapshot","idempotencyKey":"evt_12345678","occurredAt":"${new Date().toISOString()}","payload":{"account":{"balanceMinor":"10000000","equityMinor":"10000000","marginMinor":"0","freeMarginMinor":"10000000","floatingPnlMinor":"0","serverTime":"2026.07.15 23:20:00"},"positions":[],"pendingOrderCount":0},"protocolVersion":"1.0","sentAt":"${new Date().toISOString()}","sequence":1}`;
+  const rawEnvelope = `{"accountId":"acct_12345678","connectorId":"dev_12345678","eventType":"account.snapshot","idempotencyKey":"evt_12345678","occurredAt":"${new Date().toISOString()}","payload":{"account":{"balanceMinor":"10000000","equityMinor":"10000000","marginMinor":"0","freeMarginMinor":"10000000","floatingPnlMinor":"0","serverTime":"2026.07.15 23:20:00"},"positions":[],"pendingOrderCount":0},"protocolVersion":"1.1","sentAt":"${new Date().toISOString()}","sequence":1,"terminalIdentityHash":"${"a".repeat(64)}"}`;
   const signature = await signRawEnvelope("device-access-token", rawEnvelope);
   assert.equal(await verifyRawEnvelopeSignature("device-access-token", rawEnvelope, signature), true);
   assert.equal(await verifyRawEnvelopeSignature("device-access-token", rawEnvelope.replace('"sequence":1', '"sequence":2'), signature), false);
+});
+
+test("requires a valid terminal identity hash on every event", () => {
+  assert.throws(() => validateEnvelope({ ...envelope(), terminalIdentityHash: "missing" }), /terminal identity/i);
 });
 
 test("accepts buffered historical events while enforcing a fresh send timestamp", () => {

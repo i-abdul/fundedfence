@@ -11,7 +11,7 @@ export const demoAccount = {
   profitProgress: 41,
   healthScore: 78,
   lastHeartbeat: "4 seconds ago",
-  connectorVersion: "0.1.0 prototype",
+  connectorVersion: "0.2.0 prototype",
 };
 
 export const demoDrawdown = calculateDrawdown({

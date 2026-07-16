@@ -1,6 +1,6 @@
 import { constantTimeEqual } from "./pairing.ts";
 
-export const CONNECTOR_PROTOCOL_VERSION = "1.0";
+export const CONNECTOR_PROTOCOL_VERSION = "1.1";
 
 export type ConnectorEventType = "account.snapshot" | "trade.transaction" | "heartbeat" | "reconciliation";
 
@@ -8,6 +8,7 @@ export type ConnectorEnvelope = {
   protocolVersion: typeof CONNECTOR_PROTOCOL_VERSION;
   connectorId: string;
   accountId: string;
+  terminalIdentityHash: string;
   occurredAt: string;
   sentAt: string;
   sequence: number;
@@ -30,6 +31,9 @@ export function validateEnvelope(value: unknown): ConnectorEnvelope {
   const envelope = value as Partial<ConnectorEnvelope>;
   if (envelope.protocolVersion !== CONNECTOR_PROTOCOL_VERSION) throw new Error("Unsupported protocol version.");
   if (!isIdentifier(envelope.connectorId) || !isIdentifier(envelope.accountId)) throw new Error("Invalid connector or account identifier.");
+  if (typeof envelope.terminalIdentityHash !== "string" || !/^[a-f0-9]{64}$/.test(envelope.terminalIdentityHash)) {
+    throw new Error("Invalid terminal identity hash.");
+  }
   if (!Number.isSafeInteger(envelope.sequence) || Number(envelope.sequence) < 1) throw new Error("Sequence must be a positive safe integer.");
   if (!isIdentifier(envelope.idempotencyKey)) throw new Error("Invalid idempotency key.");
   if (!["account.snapshot", "trade.transaction", "heartbeat", "reconciliation"].includes(String(envelope.eventType))) {

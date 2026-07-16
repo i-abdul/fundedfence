@@ -16,15 +16,16 @@ Requires a bearer refresh token. Verifies token type, expiry, device/account sco
 
 ## `POST /connector/events`
 
-Requires bearer access token and `X-FundedFence-Signature`, an HMAC-SHA256 hex digest over the canonical JSON body using the access token as key.
+Requires bearer access token and `X-FundedFence-Signature`, an HMAC-SHA256 hex digest over the exact UTF-8 JSON request body using the access token as key.
 
-Envelope v1:
+Envelope v1.1:
 
 ```json
 {
-  "protocolVersion": "1.0",
+  "protocolVersion": "1.1",
   "connectorId": "dev_...",
   "accountId": "acct_...",
+  "terminalIdentityHash": "sha256-of-login-and-server",
   "occurredAt": "2026-07-15T07:00:00Z",
   "sentAt": "2026-07-15T07:00:02Z",
   "sequence": 42,
@@ -34,11 +35,11 @@ Envelope v1:
 }
 ```
 
-Canonicalization sorts object keys recursively, preserves array order, and emits JSON without insignificant whitespace. `sentAt` must be within five minutes; historical `occurredAt` is accepted for ordered offline recovery. Event types are `account.snapshot`, `trade.transaction`, `heartbeat`, and `reconciliation`.
+`terminalIdentityHash` must match the login/server identity captured during pairing; an account switch requires a fresh pairing. `sentAt` must be within five minutes; historical `occurredAt` is accepted for ordered offline recovery. Event types are `account.snapshot`, `trade.transaction`, `heartbeat`, and `reconciliation`.
 
-Snapshot `account` values are integer strings: balance, equity, margin, free margin, and floating P&L in currency minor units; server time in Unix seconds. Positions carry ticket/symbol/direction, integer volume units, price points, monetary P&L, and opened time. One snapshot accepts at most 100 open positions.
+Snapshot `account` values are integer strings: balance, equity, margin, free margin, and floating P&L in currency minor units; server time is the non-empty MT5 server-time string. Positions carry ticket/symbol/direction, integer volume units, price points, monetary P&L, and opened time. One snapshot accepts at most 100 open positions.
 
-Responses: `202` accepted, `200` duplicate already accepted, `401` auth/signature/revocation, `409` older non-duplicate sequence requiring reconciliation.
+Responses: `202` accepted, `200` duplicate already accepted, `401` auth/signature/revocation, `409` terminal identity changed or older non-duplicate sequence requiring reconciliation.
 
 ## `GET /accounts/{accountId}/live`
 

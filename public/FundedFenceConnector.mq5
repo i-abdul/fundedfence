@@ -4,7 +4,7 @@
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
 #property copyright "FundedFence"
-#property version   "001.000"
+#property version   "001.001"
 #property strict
 #property description "Read-only signed account-data connector for FundedFence."
 
@@ -15,9 +15,9 @@ input int    IdleSnapshotSeconds = 15;
 input int    RequestTimeoutMs = 1800;
 input int    CurrencyExponent = 2;
 
-string CONNECTOR_VERSION = "0.1.0";
-string PROTOCOL_VERSION = "1.0";
-string BUFFER_FILE = "FundedFenceConnector/pending-events.jsonl";
+string CONNECTOR_VERSION = "0.2.0";
+string PROTOCOL_VERSION = "1.1";
+string BUFFER_FILE = "FundedFenceConnector/pending-events-v1-1.jsonl";
 string CREDENTIALS_FILE = "FundedFenceConnector/credentials.tsv";
 
 string g_device_id = "";
@@ -98,7 +98,8 @@ void OnTimer()
      }
 
    int interval=(PositionsTotal()>0 || OrdersTotal()>0) ? ActiveSnapshotSeconds : IdleSnapshotSeconds;
-   if(g_snapshot_dirty || now_ms-g_last_snapshot_ms>=(long)interval*1000)
+   bool terminal_connected=(TerminalInfoInteger(TERMINAL_CONNECTED)!=0);
+   if(terminal_connected && (g_snapshot_dirty || now_ms-g_last_snapshot_ms>=(long)interval*1000))
      {
       string event_type=g_reconciliation_required ? "reconciliation" : "account.snapshot";
       QueueOrSend(event_type,BuildSnapshotPayload(),TimeGMT());
@@ -115,6 +116,14 @@ void OnTimer()
 
 bool PairConnector()
   {
+   long terminal_login=AccountInfoInteger(ACCOUNT_LOGIN);
+   string terminal_server=AccountInfoString(ACCOUNT_SERVER);
+   if(!TerminalInfoInteger(TERMINAL_CONNECTED) || terminal_login<=0 || terminal_server=="")
+     {
+      Print("FundedFence: connect MT5 to the intended broker account before pairing.");
+      g_next_pair_attempt_ms=(long)GetTickCount64()+30000;
+      return(false);
+     }
    string normalized=PairingCode;
    StringReplace(normalized," ","");
    StringReplace(normalized,"-","");
@@ -125,8 +134,7 @@ bool PairConnector()
       return(false);
      }
 
-   string identity=StringFormat("%I64d:%s",AccountInfoInteger(ACCOUNT_LOGIN),AccountInfoString(ACCOUNT_SERVER));
-   string hashed_login=Sha256Hex(identity);
+   string hashed_login=CurrentIdentityHash();
    string body="{\"pairingCode\":\""+EscapeJson(normalized)+"\","
                "\"hashedLogin\":\""+hashed_login+"\","
                "\"serverIdentity\":\""+EscapeJson(AccountInfoString(ACCOUNT_SERVER))+"\","
@@ -221,7 +229,8 @@ void QueueOrSend(const string event_type,const string payload,const datetime occ
                    "\"payload\":"+payload+","
                    "\"protocolVersion\":\""+PROTOCOL_VERSION+"\","
                    "\"sentAt\":\""+IsoUtc(TimeGMT())+"\","
-                   "\"sequence\":"+(string)g_sequence+"}";
+                   "\"sequence\":"+(string)g_sequence+","
+                   "\"terminalIdentityHash\":\""+CurrentIdentityHash()+"\"}";
    if(!SendEnvelope(envelope))
       AppendBufferedEvent(envelope);
   }
@@ -240,6 +249,12 @@ bool SendEnvelope(const string envelope)
       extra_headers="Authorization: Bearer "+g_access_token+"\r\nX-FundedFence-Signature: "+signature+"\r\n";
       status=HttpPost(g_ingestion_endpoint,envelope,extra_headers,response);
       return(status==202 || status==200);
+     }
+   if(status==409 && StringFind(response,"terminal_identity_changed")>=0)
+     {
+      Print("FundedFence: MT5 account identity changed. Connector credentials cleared; generate a new pairing code.");
+      ClearCredentials();
+      return(true);
      }
    return(false);
   }
@@ -299,7 +314,14 @@ void FlushBufferedEvents()
      {
       string envelope=FileReadString(input_handle);
       if(envelope=="") continue;
-      if(blocked || !SendEnvelope(envelope))
+      bool sent=(!blocked && SendEnvelope(envelope));
+      if(g_device_id=="")
+        {
+         FileClose(input_handle);
+         FileDelete(BUFFER_FILE,FILE_COMMON);
+         return;
+        }
+      if(!sent)
         {
          blocked=true;
          ArrayResize(remaining,remaining_count+1);
@@ -396,6 +418,12 @@ string EscapeJson(string value)
    return(value);
   }
 
+string CurrentIdentityHash()
+  {
+   string identity=StringFormat("%I64d:%s",AccountInfoInteger(ACCOUNT_LOGIN),AccountInfoString(ACCOUNT_SERVER));
+   return(Sha256Hex(identity));
+  }
+
 string IsoUtc(const datetime value)
   {
    MqlDateTime parts;
@@ -436,6 +464,7 @@ void ClearCredentials()
    g_refresh_endpoint="";
    g_sequence=0;
    FileDelete(CREDENTIALS_FILE,FILE_COMMON);
+   FileDelete(BUFFER_FILE,FILE_COMMON);
   }
 
 bool LoadCredentials()

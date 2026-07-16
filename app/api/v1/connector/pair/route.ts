@@ -1,4 +1,4 @@
-import { issueDeviceToken } from "@/lib/domain/connector-protocol";
+import { CONNECTOR_PROTOCOL_VERSION, issueDeviceToken } from "@/lib/domain/connector-protocol";
 import { hashPairingCode, normalizePairingCode } from "@/lib/domain/pairing";
 import { sha256Hex } from "@/lib/server/crypto";
 import type { AppDatabase } from "@/lib/server/database";
@@ -73,7 +73,7 @@ export async function POST(request: Request): Promise<Response> {
       ingestionEndpoint: new URL("/api/v1/connector/events", request.url).toString(),
       refreshEndpoint: new URL("/api/v1/connector/refresh", request.url).toString(),
       configurationVersion: "1",
-      protocolVersion: "1.0",
+      protocolVersion: CONNECTOR_PROTOCOL_VERSION,
     });
   } catch (error) {
     return jsonError(400, "pairing_rejected", publicMessage(error), correlationId);
