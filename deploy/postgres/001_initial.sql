@@ -139,11 +139,15 @@ CREATE TABLE IF NOT EXISTS pairing_codes (
 
 CREATE INDEX IF NOT EXISTS pairing_codes_owner_idx ON pairing_codes (owner_user_id);
 
-ALTER TABLE connector_devices ADD COLUMN IF NOT EXISTS pairing_code_id text REFERENCES pairing_codes(id);
+ALTER TABLE connector_devices ADD COLUMN IF NOT EXISTS pairing_code_id text;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'connector_devices_pairing_code_fk' AND conrelid = 'connector_devices'::regclass) THEN
     ALTER TABLE connector_devices ADD CONSTRAINT connector_devices_pairing_code_fk FOREIGN KEY (pairing_code_id) REFERENCES pairing_codes(id);
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'connector_devices_pairing_code_fk' AND conrelid = 'connector_devices'::regclass)
+     AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'connector_devices_pairing_code_id_fkey' AND conrelid = 'connector_devices'::regclass) THEN
+    ALTER TABLE connector_devices DROP CONSTRAINT connector_devices_pairing_code_id_fkey;
   END IF;
 END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS connector_devices_pairing_code_unique ON connector_devices (pairing_code_id);

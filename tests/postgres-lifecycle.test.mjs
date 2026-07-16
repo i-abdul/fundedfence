@@ -5,7 +5,7 @@ import test from "node:test";
 import pg from "pg";
 
 const { Pool } = pg;
-const baseConnectionString = process.env.TEST_POSTGRES_URL;
+const baseConnectionString = process.env.TEST_POSTGRES_URL ?? (process.env.RUN_POSTGRES_INTEGRATION === "1" ? process.env.POSTGRES_URL : undefined);
 const enabled = process.env.RUN_POSTGRES_INTEGRATION === "1" && Boolean(baseConnectionString);
 
 test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and reconnect", { skip: enabled ? false : "Set RUN_POSTGRES_INTEGRATION=1 and TEST_POSTGRES_URL to run." }, async (t) => {
