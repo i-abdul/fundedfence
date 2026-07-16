@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Brand } from "@/components/Brand";
+import { SessionActivityGuard } from "@/components/SessionActivityGuard";
 import { accountContextFromSearch } from "@/lib/product/firm-catalog";
-import { appSignInPath, getAppUser } from "@/lib/server/auth";
+import { appSignInPath, getAppUser, getSessionIdleTimeoutSeconds } from "@/lib/server/auth";
 import { PairingPanel } from "./PairingPanel";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function PairingPage({ searchParams }: PairingPageProps) {
   const returnTo = pairingReturnPath(accountContext);
   return (
     <main className="setup-page pairing-page">
+      {user && <SessionActivityGuard idleTimeoutSeconds={getSessionIdleTimeoutSeconds()} />}
       <header className="setup-header">
         <Brand />
         <span>MT5 connector</span>

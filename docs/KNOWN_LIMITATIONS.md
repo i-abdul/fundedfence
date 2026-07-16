@@ -4,7 +4,7 @@
 - The EA source has not been compiled in MetaEditor or exercised in an MT5 terminal in this workspace.
 - EA credentials currently use an MT5 common data file. Operating-system protected secret storage remains future hardening work.
 - The manual `.mq5` download is not a code-signed `.ex5` or Windows installer.
-- Pending orders and completed deals remain in raw events; normalized `Order` and `Deal` tables are not yet implemented.
+- Deal and pending-order normalization is implemented, but the new EA 0.4 source still requires MetaEditor compilation and live partial-close/commission verification.
 - API routes have unit/static coverage but not yet isolated-D1 integration coverage.
 - The dashboard polls authenticated live state every five seconds; SSE/reconnect reconciliation is not yet implemented.
 - Connection state is derived on reads; no scheduled stale/offline transition or critical offline notification exists.

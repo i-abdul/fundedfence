@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getSessionIdleTimeoutSeconds } from "@/lib/server/auth";
 import { Brand } from "./Brand";
+import { SessionActivityGuard } from "./SessionActivityGuard";
 
 const navigation = [
   ["Overview", "/dashboard", "OV"],
@@ -13,6 +15,7 @@ const navigation = [
 export function AppShell({ active, children }: { active: string; children: ReactNode }) {
   return (
     <div className="app-frame">
+      <SessionActivityGuard idleTimeoutSeconds={getSessionIdleTimeoutSeconds()} />
       <aside className="sidebar">
         <div className="sidebar-top"><Brand /></div>
         <nav className="side-nav" aria-label="Product navigation">

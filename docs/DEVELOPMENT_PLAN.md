@@ -23,13 +23,16 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 - [x] Bind dashboard account identity, balance, equity, positions, heartbeat, and snapshot status to live APIs.
 - [x] Disable illustrative risk values when a real account is selected.
 - [x] Show a prominent protection-paused state when telemetry becomes stale.
+- [x] Enforce a server-validated 30-minute idle timeout and synchronize activity across duplicated tabs.
+- [x] Redirect a newly paired account to its dashboard while preserving the pairing diagnostics page for existing accounts.
+- [x] Make the landing page responsive without scaled fixed-width content and raise dense UI text to a readable 100%-zoom baseline.
 
 ### Remaining Sprint 1 work
 
 - [x] Add PostgreSQL-backed integration tests for expiry, concurrent reuse, replacement, tenant isolation, token refresh/revocation, reconnect, duplicate events, and out-of-order events.
 - [x] Add connector/device revocation and an explicit same-account re-pair flow.
 - [x] Capture symbol digits, tick size, loss tick value, and swap for open positions.
-- [ ] Capture commission, deals, pending-order details, and partial closes.
+- [x] Capture commission, deals, pending-order details, and partial closes.
 - [x] Calculate auditable open risk at stop-loss from broker contract metadata and flag missing stops.
 - [x] Add a PostgreSQL freshness monitor that records delayed/offline transitions and creates a deduplicated connector-paused alert while the dashboard is closed.
 - [x] Add remembered account selection for users with more than one account workspace.
@@ -43,6 +46,8 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 4. The dashboard never mixes a real account with illustrative risk calculations.
 5. Connector restart resumes with the same device credentials and increasing sequence.
 6. All lifecycle and tenant-isolation tests pass against PostgreSQL.
+7. Idle sessions expire on the server, and active duplicated tabs share session activity without unexpected re-login.
+8. The landing page has no horizontal overflow at phone widths and core product text is readable at 100% browser zoom.
 
 ## Sprint 2 — versioned FundedNext rule profiles
 

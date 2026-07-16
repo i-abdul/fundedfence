@@ -39,6 +39,8 @@ docker compose --env-file .env.oci up -d --build
 
 Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` after creating a Google OAuth client. SMTP is intentionally left as a later password-reset setup item.
 
+Authenticated workspaces use a server-validated inactivity timeout. Set `SESSION_IDLE_TIMEOUT_MINUTES` to the desired limit; it defaults to 30 minutes and activity is synchronized across open tabs.
+
 ## Verification
 
 ```text

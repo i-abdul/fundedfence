@@ -11,7 +11,15 @@ export type AppUser = {
 
 const SESSION_COOKIE = "fundedfence_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 14;
+const DEFAULT_SESSION_IDLE_SECONDS = 60 * 30;
 const PASSWORD_ITERATIONS = 210_000;
+
+type SessionPayload = {
+  email: string;
+  displayName: string;
+  expiresAt: number;
+  lastActivityAt: number;
+};
 
 export async function getAppUser(): Promise<AppUser | null> {
   const cookieStore = await cookies();
@@ -24,6 +32,35 @@ export async function getAppUser(): Promise<AppUser | null> {
     email: payload.email,
     fullName: payload.displayName || null,
   };
+}
+
+export function getSessionIdleTimeoutSeconds(): number {
+  const configuredMinutes = Number(process.env.SESSION_IDLE_TIMEOUT_MINUTES ?? "30");
+  if (!Number.isFinite(configuredMinutes) || configuredMinutes < 1 || configuredMinutes > 1_440) {
+    return DEFAULT_SESSION_IDLE_SECONDS;
+  }
+  return Math.round(configuredMinutes * 60);
+}
+
+export async function refreshSessionActivity(): Promise<AppUser | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const now = Date.now();
+  const payload = await verifySession(token, now);
+  if (!payload) {
+    cookieStore.delete(SESSION_COOKIE);
+    return null;
+  }
+  const refreshed = { ...payload, lastActivityAt: now };
+  cookieStore.set(SESSION_COOKIE, await signSessionPayload(refreshed), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: usesHttpsBaseUrl(),
+    maxAge: Math.max(1, Math.floor((payload.expiresAt - now) / 1000)),
+    path: "/",
+  });
+  return sessionUser(refreshed);
 }
 
 export async function requireAppUser(returnTo: string): Promise<AppUser> {
@@ -100,27 +137,46 @@ export function normalizeEmail(value: string): string {
 }
 
 async function signSession(user: AppUser): Promise<string> {
-  const payload = toBase64Url(new TextEncoder().encode(JSON.stringify({
+  const now = Date.now();
+  return signSessionPayload({
     email: normalizeEmail(user.email),
     displayName: user.displayName,
-    expiresAt: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
-  })));
+    expiresAt: now + SESSION_MAX_AGE_SECONDS * 1000,
+    lastActivityAt: now,
+  });
+}
+
+async function signSessionPayload(session: SessionPayload): Promise<string> {
+  const payload = toBase64Url(new TextEncoder().encode(JSON.stringify(session)));
   const signature = await hmac(payload, await requireSecret("APP_SESSION_SECRET"));
   return `${payload}.${signature}`;
 }
 
-async function verifySession(token: string): Promise<{ email: string; displayName: string; expiresAt: number } | null> {
+async function verifySession(token: string, now = Date.now()): Promise<SessionPayload | null> {
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
   const expected = await hmac(payload, await requireSecret("APP_SESSION_SECRET"));
   if (!timingSafeEqual(new TextEncoder().encode(signature), new TextEncoder().encode(expected))) return null;
   try {
-    const parsed = JSON.parse(new TextDecoder().decode(fromBase64Url(payload))) as { email: string; displayName: string; expiresAt: number };
-    if (parsed.expiresAt <= Date.now()) return null;
-    return parsed;
+    const parsed = JSON.parse(new TextDecoder().decode(fromBase64Url(payload))) as Partial<SessionPayload>;
+    if (typeof parsed.email !== "string" || typeof parsed.displayName !== "string" || !Number.isFinite(parsed.expiresAt)) return null;
+    if (Number(parsed.expiresAt) <= now) return null;
+    // Cookies issued before idle-session enforcement are accepted once and
+    // refreshed by the activity endpoint without interrupting signed-in users.
+    const lastActivityAt = Number.isFinite(parsed.lastActivityAt) ? Number(parsed.lastActivityAt) : now;
+    if (now - lastActivityAt >= getSessionIdleTimeoutSeconds() * 1000) return null;
+    return { email: parsed.email, displayName: parsed.displayName, expiresAt: Number(parsed.expiresAt), lastActivityAt };
   } catch {
     return null;
   }
+}
+
+function sessionUser(payload: SessionPayload): AppUser {
+  return {
+    displayName: payload.displayName || payload.email,
+    email: payload.email,
+    fullName: payload.displayName || null,
+  };
 }
 
 async function hmac(value: string, secret: string): Promise<string> {

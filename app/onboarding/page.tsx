@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Brand } from "@/components/Brand";
+import { SessionActivityGuard } from "@/components/SessionActivityGuard";
 import { firmCatalog } from "@/lib/product/firm-catalog";
-import { requireAppUser } from "@/lib/server/auth";
+import { getSessionIdleTimeoutSeconds, requireAppUser } from "@/lib/server/auth";
 import { AccountSetupForm } from "./AccountSetupForm";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export default async function OnboardingPage() {
   await requireAppUser("/onboarding");
   return (
     <main className="setup-page">
+      <SessionActivityGuard idleTimeoutSeconds={getSessionIdleTimeoutSeconds()} />
       <header className="setup-header">
         <Brand />
         <span>Secure account setup</span>

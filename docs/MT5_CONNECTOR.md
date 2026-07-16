@@ -4,7 +4,7 @@
 
 `connector/FundedFenceConnector.mq5` is an Expert Advisor only because MT5 permits `WebRequest` from EAs/scripts, not indicators. It is a data connector and contains no order placement, order modification, position close, stop-loss change, take-profit change, lot-sizing, copy-trading, signal, grid, or martingale logic.
 
-The prototype reads account state, open positions, broker contract metadata, pending-order count, terminal health, and trade-transaction identifiers. Position snapshots include symbol digits, trade tick size, loss tick value per lot, and swap so the server can calculate open risk at stop without assuming a universal Forex contract. `OnTradeTransaction` performs no network I/O; it marks state dirty and lets `OnTimer` send the signed event and reconciliation.
+The prototype reads account state, open positions, broker contract metadata, complete pending-order details, terminal health, and normalized deal economics. Position snapshots include symbol digits, trade tick size, loss tick value per lot, and swap so the server can calculate open risk at stop without assuming a universal Forex contract. Deal events include entry/exit type, position association, volume, price, profit, commission, swap, and fee. This makes partial closes reproducible from the exit deal and following position-volume reconciliation. `OnTradeTransaction` performs no network I/O; it queues each callback and lets `OnTimer` send signed events followed by reconciliation.
 
 ## Pairing and credentials
 
@@ -17,7 +17,7 @@ The current EA persists account-scoped credentials and the last sequence in the 
 - Reconciliation immediately after pairing and connector start while MT5 is connected.
 - Snapshot every two seconds when positions or pending orders exist.
 - Snapshot every 15 seconds while idle.
-- Trade-transaction marker on the next timer tick after an MT5 transaction callback.
+- Every queued trade transaction on the next timer tick, including normalized deal data when MT5 created a deal.
 - Heartbeat at least every ten seconds between snapshots.
 
 Unsent envelopes are appended to an ordered terminal common-file buffer. Flush stops at the first failure to preserve order. Each later send receives a fresh signature; historical occurrence time remains unchanged while `sentAt` reflects the new attempt.

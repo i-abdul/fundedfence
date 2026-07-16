@@ -163,6 +163,43 @@ export const positions = sqliteTable("positions", {
   ...timestamps,
 }, (table) => [uniqueIndex("positions_account_ticket_unique").on(table.tradingAccountId, table.ticket), index("positions_account_open_idx").on(table.tradingAccountId, table.closedAt)]);
 
+export const pendingOrders = sqliteTable("pending_orders", {
+  id: text("id").primaryKey(),
+  tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
+  ticket: text("ticket").notNull(),
+  symbol: text("symbol").notNull(),
+  orderType: integer("order_type").notNull(),
+  volumeInitialUnits: text("volume_initial_units").notNull(),
+  volumeCurrentUnits: text("volume_current_units").notNull(),
+  openPricePoints: text("open_price_points").notNull(),
+  stopLossPricePoints: text("stop_loss_price_points"),
+  takeProfitPricePoints: text("take_profit_price_points"),
+  placedAt: text("placed_at").notNull(),
+  expiresAt: text("expires_at"),
+  closedAt: text("closed_at"),
+  ...timestamps,
+}, (table) => [uniqueIndex("pending_orders_account_ticket_unique").on(table.tradingAccountId, table.ticket), index("pending_orders_account_open_idx").on(table.tradingAccountId, table.closedAt)]);
+
+export const deals = sqliteTable("deals", {
+  id: text("id").primaryKey(),
+  tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
+  connectorDeviceId: text("connector_device_id").notNull().references(() => connectorDevices.id),
+  ticket: text("ticket").notNull(),
+  orderTicket: text("order_ticket").notNull(),
+  positionTicket: text("position_ticket").notNull(),
+  symbol: text("symbol").notNull(),
+  dealType: integer("deal_type").notNull(),
+  entryType: integer("entry_type").notNull(),
+  volumeUnits: text("volume_units").notNull(),
+  pricePoints: text("price_points").notNull(),
+  profitMinor: text("profit_minor").notNull(),
+  commissionMinor: text("commission_minor").notNull(),
+  swapMinor: text("swap_minor").notNull(),
+  feeMinor: text("fee_minor").notNull(),
+  occurredAt: text("occurred_at").notNull(),
+  ...timestamps,
+}, (table) => [uniqueIndex("deals_account_ticket_unique").on(table.tradingAccountId, table.ticket), index("deals_account_time_idx").on(table.tradingAccountId, table.occurredAt), index("deals_position_idx").on(table.tradingAccountId, table.positionTicket)]);
+
 export const tradeEvents = sqliteTable("trade_events", {
   id: text("id").primaryKey(),
   tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),

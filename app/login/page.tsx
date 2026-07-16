@@ -4,7 +4,7 @@ import { Brand } from "@/components/Brand";
 import { getAppUser } from "@/lib/server/auth";
 
 type AuthPageProps = {
-  searchParams: Promise<{ error?: string; return_to?: string }>;
+  searchParams: Promise<{ error?: string; reason?: string; return_to?: string }>;
 };
 
 export default async function LoginPage({ searchParams }: AuthPageProps) {
@@ -20,6 +20,7 @@ export default async function LoginPage({ searchParams }: AuthPageProps) {
         <p className="eyebrow">Secure workspace access</p>
         <h1>Welcome back.</h1>
         <p>Sign in with your FundedFence password, or connect Google once OAuth keys are configured.</p>
+        {params.reason === "idle" && <p className="form-error" role="status">You were signed out after 30 minutes without activity. Sign in to continue.</p>}
         {params.error && <p className="form-error" role="alert">{params.error}</p>}
         <form className="auth-form" action="/api/auth/login" method="post">
           <input type="hidden" name="return_to" value={returnTo} />

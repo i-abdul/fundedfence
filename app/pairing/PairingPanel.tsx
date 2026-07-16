@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { AccountContext } from "@/lib/product/firm-catalog";
 
 type PairingResult = { pairingCode: string; expiresAt: string; accountId: string; replacingDevice?: boolean };
@@ -31,6 +32,7 @@ type LiveState = {
 };
 
 export function PairingPanel({ authenticated, signInPath, accountContext }: { authenticated: boolean; signInPath: string; accountContext: AccountContext }) {
+  const router = useRouter();
   const [result, setResult] = useState<PairingResult | null>(null);
   const [overview, setOverview] = useState<PairingOverview | null>(null);
   const [liveState, setLiveState] = useState<LiveState | null>(null);
@@ -141,6 +143,14 @@ export function PairingPanel({ authenticated, signInPath, accountContext }: { au
   const codeTitle = paired ? "Used by MT5" : resultExpired ? "Code expired" : visibleCode ? "Ready for MT5" : restoredActiveCode ? "Active code hidden" : "Generate a secure code";
   const codeBadge = paired ? "PAIRED" : visibleCode ? formatRemaining(remainingMs) : resultExpired ? "EXPIRED" : "SECURE";
 
+  useEffect(() => {
+    // Redirect only when this page generated the code that was just consumed.
+    // An already-paired account can still open this page for diagnostics.
+    if (!result || !paired) return;
+    const redirectTimer = window.setTimeout(() => router.replace("/dashboard"), 1_200);
+    return () => window.clearTimeout(redirectTimer);
+  }, [paired, result, router]);
+
   return (
     <div className="pairing-panel">
       <div className="pairing-code-card">
@@ -161,7 +171,9 @@ export function PairingPanel({ authenticated, signInPath, accountContext }: { au
         {resultExpired && !paired && <p>This code can no longer be used. Generate a new one before pairing MT5.</p>}
         {restoredActiveCode && <p>An unexpired code exists, but codes are shown only once. Generate a replacement if you did not save it.</p>}
         {!result && !paired && !restoredActiveCode && <p>The code is shown only after an authenticated account workspace is created.</p>}
-        {message && <p className="form-error" role="alert">{message}</p>}
+        {result && paired
+          ? <p className="form-success" role="status">Pairing successful. Opening your dashboard…</p>
+          : message && <p className="form-error" role="alert">{message}</p>}
         {authenticated
           ? <button className="button button-primary full" type="button" onClick={createCode} disabled={loading}>{loading ? "Creating secure code…" : paired ? "Re-pair this MT5 account" : visibleCode || restoredActiveCode ? "Replace pairing code" : "Generate pairing code"}</button>
           : <a className="button button-primary full" href={signInPath}>Sign in to generate code</a>}

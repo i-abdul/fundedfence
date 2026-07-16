@@ -22,6 +22,13 @@
       "when": 1784186519143,
       "tag": "0002_little_madame_web",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784191551566,
+      "tag": "0003_gifted_pete_wisdom",
+      "breakpoints": true
     }
   ]
 }

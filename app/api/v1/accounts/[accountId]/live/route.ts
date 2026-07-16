@@ -37,6 +37,10 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
       .bind(accountId).first<Record<string, unknown>>();
     const positionRows = await database.prepare("SELECT ticket, symbol, direction, volume_units, open_price_points, current_price_points, stop_loss_price_points, take_profit_price_points, price_digits, tick_size_points, tick_value_loss_minor_per_lot, swap_minor, floating_pnl_minor, opened_at FROM positions WHERE trading_account_id = ? AND closed_at IS NULL ORDER BY opened_at DESC")
       .bind(accountId).all<PositionRow>();
+    const pendingOrders = await database.prepare("SELECT ticket, symbol, order_type, volume_initial_units, volume_current_units, open_price_points, stop_loss_price_points, take_profit_price_points, placed_at, expires_at FROM pending_orders WHERE trading_account_id = ? AND closed_at IS NULL ORDER BY placed_at DESC")
+      .bind(accountId).all<Record<string, unknown>>();
+    const recentDeals = await database.prepare("SELECT ticket, order_ticket, position_ticket, symbol, deal_type, entry_type, volume_units, price_points, profit_minor, commission_minor, swap_minor, fee_minor, occurred_at FROM deals WHERE trading_account_id = ? ORDER BY occurred_at DESC LIMIT 50")
+      .bind(accountId).all<Record<string, unknown>>();
     const positions = positionRows.results.map((position) => ({
       ...position,
       risk_at_stop_minor: riskAtStop(position),
@@ -49,6 +53,8 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
         account,
         snapshot: snapshot ?? null,
         positions,
+        pendingOrders: pendingOrders.results,
+        recentDeals: recentDeals.results,
         riskSummary: {
           known_risk_minor: knownRiskMinor.toString(),
           positions_without_stop: positionsWithoutStop,

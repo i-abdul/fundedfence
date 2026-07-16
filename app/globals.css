@@ -371,6 +371,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .pairing-code span { align-items: center; background: rgba(255,255,255,.03); border: 1px solid var(--line-strong); border-radius: 8px; display: flex; font-family: var(--font-geist-mono), monospace; font-size: 22px; height: 49px; justify-content: center; }
 .pairing-code-card > p { color: #65766d; font-size: 8px; line-height: 1.5; text-align: center; }
 .form-error { color: #e99a9a !important; }
+.form-success { color: var(--mint) !important; }
 .diagnostic-heading { align-items: center; display: flex; gap: 11px; }
 .diagnostic-icon { align-items: center; background: rgba(154,230,189,.07); border-radius: 8px; color: var(--mint); display: flex; height: 31px; justify-content: center; width: 31px; }
 .diagnostic-heading strong, .diagnostic-heading small { display: block; }
@@ -435,6 +436,65 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .auth-switch a { color: var(--mint); }
 .auth-back { color: #64746c; font-size: 9px; margin-top: 24px; }
 
+/* Readable product type scale. The first dashboard pass was composed at a
+   presentation scale and required browser zoom. These minimums keep dense
+   monitoring views legible at the browser's default 100% zoom. */
+.marketing-nav > div:nth-child(2) a, .nav-signin { font-size: 14px; }
+.trust-chip, .hero-assurances, .security-points span { font-size: 12px; }
+.proof-strip p, .proof-strip div { font-size: 11px; }
+.mini-brand, .preview-buffers > p, .preview-position b { font-size: 12px; }
+.preview-label, .preview-heading small, .preview-buffers small, .preview-position small,
+.preview-heading em, .preview-rule-row small, .preview-rule-row em, .floating-alert small { font-size: 10px; }
+.window-live, .floating-alert strong { font-size: 12px; }
+.preview-heading strong { font-size: 19px; }
+.preview-buffers > p strong, .preview-buffers strong, .preview-rule-row strong { font-size: 14px; }
+.protection-list p, .cta-section > div:last-child > p { font-size: 14px; }
+.terminal-node small, .shield-node small, .connector-path, .connector-path em,
+.marketing-footer p, .marketing-footer > div a { font-size: 10px; }
+
+.side-nav a { font-size: 14px; }
+.nav-glyph, .mini-shield, .account-avatar { font-size: 9px; }
+.sidebar-account strong, .account-identity strong { font-size: 12px; }
+.sidebar-account small, .account-identity small, .signout-button { font-size: 10px; }
+.demo-banner, .account-selector { font-size: 12px; }
+.phase-pill, .status-pill, .panel-count { font-size: 10px; }
+.live-state { font-size: 11px; }
+.panel-heading h2 { font-size: 17px; }
+.health-copy > p { font-size: 13px; }
+.health-metrics small, .balance-values small, .metric-card small, .metric-card p,
+.profit-progress p, .panel-footer, .plan-budget small, .plan-budget > span,
+.rule-card small, .rule-card p, .timeline-item time, .timeline-item small,
+.product-footer { font-size: 10px; }
+.health-metrics strong { font-size: 15px; }
+.profit-progress > div:first-child span, .plan-list div, .position-row,
+.timeline-item strong, .protection-panel > p:not(.eyebrow) { font-size: 11px; }
+.profit-progress > div:first-child strong, .position-row strong { font-size: 12px; }
+.position-row small { font-size: 10px; }
+.position-header, .position-row em, .rule-card > em { font-size: 9px; }
+.rule-card strong { font-size: 13px; }
+.plan-warning strong, .plan-warning small { font-size: 10px; }
+
+.setup-header > span, .setup-header-actions a, .setup-steps strong,
+.setup-form label > span, .read-only-callout strong, .install-steps strong { font-size: 12px; }
+.setup-steps li > span, .setup-steps small, .setup-assurance small,
+.setup-progress > span, .setup-form label > small, .check-row span small,
+.read-only-callout p, .install-steps p, .install-steps a, .manual-note span,
+.selected-account-card em, .pairing-code-card > p, .diagnostic-heading small,
+.diagnostic-card dl div { font-size: 10px; }
+.setup-assurance strong, .check-row span strong, .manual-note strong,
+.selected-account-card span, .pairing-code-header strong, .diagnostic-heading strong { font-size: 11px; }
+.setup-lead, .pairing-copy > p { font-size: 14px; }
+.selected-account-card small, .pairing-code-header small, .pairing-code-header em { font-size: 9px; }
+.selected-account-card strong { font-size: 14px; }
+
+.rule-version-card > div small, .rule-version-card dt, .rule-detail-title em,
+.rule-detail-values small, .rule-source button, .auth-divider { font-size: 9px; }
+.rule-version-card > div p, .calculation-note strong, .calculation-note p,
+.rule-source, .auth-form label, .auth-help a, .auth-card ul, .auth-switch, .auth-back { font-size: 11px; }
+.rule-version-card dd { font-size: 11px; }
+.rule-detail-values strong { font-size: 13px; }
+.auth-card > p:not(.eyebrow):not(.auth-switch) { font-size: 13px; }
+
 @media (max-width: 1100px) {
   .hero { grid-template-columns: 1fr; padding-top: 85px; }
   .hero-copy { text-align: center; }
@@ -454,8 +514,8 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .marketing-nav > div:nth-child(2), .nav-signin { display: none; }
   .hero { min-height: auto; padding: 70px 18px; }
   .hero h1 { font-size: 46px; }
-  .hero-product { margin-left: 0; min-width: 690px; transform: scale(.82); transform-origin: left top; }
-  .hero { overflow: hidden; }
+  .hero-product { margin-left: 0; min-width: 0; transform: none; width: 100%; }
+  .hero { overflow: visible; }
   .proof-strip { margin: 0 18px; }
   .proof-strip div { flex-wrap: wrap; gap: 18px; }
   .protection-section, .security-card, .cta-section { grid-template-columns: 1fr; padding-bottom: 85px; padding-top: 85px; }
@@ -486,8 +546,18 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .hero-actions { flex-direction: column; }
   .hero-actions .button { width: 100%; }
   .hero-assurances { align-items: flex-start; flex-direction: column; }
-  .hero-product { min-width: 680px; transform: scale(.59); transform-origin: left top; }
-  .hero-product { margin-bottom: -145px; }
+  .hero-product { margin-bottom: 0; min-width: 0; transform: none; }
+  .product-window { min-height: 0; }
+  .window-bar { padding: 0 14px; }
+  .preview-label { display: none; }
+  .preview-body { padding: 16px; }
+  .preview-heading { gap: 12px; }
+  .preview-health { grid-template-columns: 1fr; justify-items: center; }
+  .preview-buffers { width: 100%; }
+  .preview-buffers > div, .preview-rule-row { grid-template-columns: 1fr; }
+  .preview-position { gap: 10px; grid-template-columns: 1fr 1fr; }
+  .preview-position > span:first-child { grid-column: 1 / -1; }
+  .floating-alert { bottom: auto; margin-top: 12px; max-width: 100%; position: relative; right: auto; width: 100%; }
   .proof-strip div span:nth-child(n+4) { display: none; }
   .protection-section, .security-section, .cta-section { padding-left: 18px; padding-right: 18px; }
   .connector-diagram { grid-template-columns: 1fr; gap: 15px; }

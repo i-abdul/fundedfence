@@ -4,7 +4,7 @@
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
 #property copyright "FundedFence"
-#property version   "001.003"
+#property version   "001.004"
 #property strict
 #property description "Read-only signed account-data connector for FundedFence."
 
@@ -16,7 +16,7 @@ input int    IdleSnapshotSeconds = 15;
 input int    RequestTimeoutMs = 1800;
 input int    CurrencyExponent = 2;
 
-string CONNECTOR_VERSION = "0.3.0";
+string CONNECTOR_VERSION = "0.4.0";
 string PROTOCOL_VERSION = "1.1";
 string BUFFER_FILE = "FundedFenceConnector/pending-events-v1-1.jsonl";
 string CREDENTIALS_FILE = "FundedFenceConnector/credentials.tsv";
@@ -34,11 +34,11 @@ long   g_next_pair_attempt_ms = 0;
 int    g_pair_failures = 0;
 bool   g_snapshot_dirty = true;
 bool   g_reconciliation_required = true;
-bool   g_trade_event_pending = false;
-long   g_pending_order = 0;
-long   g_pending_deal = 0;
-long   g_pending_position = 0;
-int    g_pending_transaction_type = -1;
+int      g_pending_transaction_types[];
+ulong    g_pending_orders[];
+ulong    g_pending_deals[];
+ulong    g_pending_positions[];
+datetime g_pending_event_times[];
 
 int OnInit()
   {
@@ -74,14 +74,27 @@ void OnTradeTransaction(const MqlTradeTransaction &transaction,
                         const MqlTradeRequest &request,
                         const MqlTradeResult &result)
   {
-   // Do not perform network I/O inside the trade callback. Capture identifiers
-   // and let OnTimer send a signed event followed by a full reconciliation.
-   g_pending_transaction_type=(int)transaction.type;
-   g_pending_order=(long)transaction.order;
-   g_pending_deal=(long)transaction.deal;
-   g_pending_position=(long)transaction.position;
-   g_trade_event_pending=true;
+   // Do not perform network I/O inside the trade callback. Queue every event
+   // so rapid fills and partial closes cannot overwrite one another before the
+   // timer sends their normalized deal details and a full reconciliation.
+   int count=ArraySize(g_pending_transaction_types);
+   if(count<512)
+     {
+      ArrayResize(g_pending_transaction_types,count+1,128);
+      ArrayResize(g_pending_orders,count+1,128);
+      ArrayResize(g_pending_deals,count+1,128);
+      ArrayResize(g_pending_positions,count+1,128);
+      ArrayResize(g_pending_event_times,count+1,128);
+      g_pending_transaction_types[count]=(int)transaction.type;
+      g_pending_orders[count]=transaction.order;
+      g_pending_deals[count]=transaction.deal;
+      g_pending_positions[count]=transaction.position;
+      g_pending_event_times[count]=TimeGMT();
+     }
+   else
+      Print("FundedFence: trade-event queue reached 512 entries; full reconciliation retained.");
    g_snapshot_dirty=true;
+   g_reconciliation_required=true;
   }
 
 void OnTimer()
@@ -95,13 +108,22 @@ void OnTimer()
      }
 
    FlushBufferedEvents();
-   if(g_trade_event_pending)
+   int pending_count=ArraySize(g_pending_transaction_types);
+   for(int pending_index=0;pending_index<pending_count;pending_index++)
      {
-      string payload=StringFormat("{\"transactionType\":%d,\"orderTicket\":\"%I64d\",\"dealTicket\":\"%I64d\",\"positionTicket\":\"%I64d\"}",
-                                  g_pending_transaction_type,g_pending_order,g_pending_deal,g_pending_position);
-      QueueOrSend("trade.transaction",payload,TimeGMT());
-      g_trade_event_pending=false;
-      g_reconciliation_required=true;
+      string payload=BuildTradeTransactionPayload(g_pending_transaction_types[pending_index],
+                                                   g_pending_orders[pending_index],
+                                                   g_pending_deals[pending_index],
+                                                   g_pending_positions[pending_index]);
+      QueueOrSend("trade.transaction",payload,g_pending_event_times[pending_index]);
+     }
+   if(pending_count>0)
+     {
+      ArrayResize(g_pending_transaction_types,0);
+      ArrayResize(g_pending_orders,0);
+      ArrayResize(g_pending_deals,0);
+      ArrayResize(g_pending_positions,0);
+      ArrayResize(g_pending_event_times,0);
      }
 
    int interval=(PositionsTotal()>0 || OrdersTotal()>0) ? ActiveSnapshotSeconds : IdleSnapshotSeconds;
@@ -219,13 +241,64 @@ string BuildSnapshotPayload()
      }
    positions+="]";
 
+   string pending_orders="[";
+   first=true;
+   for(int order_index=0;order_index<OrdersTotal();order_index++)
+     {
+      ulong order_ticket=OrderGetTicket(order_index);
+      if(order_ticket==0 || !OrderSelect(order_ticket))
+         continue;
+      string order_symbol=OrderGetString(ORDER_SYMBOL);
+      datetime expiration=(datetime)OrderGetInteger(ORDER_TIME_EXPIRATION);
+      if(!first) pending_orders+=",";
+      first=false;
+      pending_orders+="{\"ticket\":\""+(string)order_ticket+"\","+
+                      "\"symbol\":\""+EscapeJson(order_symbol)+"\","+
+                      "\"orderType\":"+(string)OrderGetInteger(ORDER_TYPE)+","+
+                      "\"volumeInitialUnits\":\""+(string)VolumeToUnits(OrderGetDouble(ORDER_VOLUME_INITIAL))+"\","+
+                      "\"volumeCurrentUnits\":\""+(string)VolumeToUnits(OrderGetDouble(ORDER_VOLUME_CURRENT))+"\","+
+                      "\"openPricePoints\":\""+(string)PriceToPoints(order_symbol,OrderGetDouble(ORDER_PRICE_OPEN))+"\","+
+                      "\"stopLossPricePoints\":"+NullablePrice(order_symbol,OrderGetDouble(ORDER_SL))+","+
+                      "\"takeProfitPricePoints\":"+NullablePrice(order_symbol,OrderGetDouble(ORDER_TP))+","+
+                      "\"placedAt\":\""+IsoUtc((datetime)OrderGetInteger(ORDER_TIME_SETUP))+"\","+
+                      "\"expiresAt\":"+(expiration>0 ? "\""+IsoUtc(expiration)+"\"" : "null")+"}";
+     }
+   pending_orders+="]";
+
    string account="{\"balanceMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_BALANCE))+"\","
                   "\"equityMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_EQUITY))+"\","
                   "\"marginMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_MARGIN))+"\","
                   "\"freeMarginMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_MARGIN_FREE))+"\","
                   "\"floatingPnlMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_PROFIT))+"\","
                   "\"serverTime\":\""+(string)TimeTradeServer()+"\"}";
-   return("{\"account\":"+account+",\"positions\":"+positions+",\"pendingOrderCount\":"+(string)OrdersTotal()+"}");
+   return("{\"account\":"+account+",\"positions\":"+positions+",\"pendingOrders\":"+pending_orders+",\"pendingOrderCount\":"+(string)OrdersTotal()+"}");
+  }
+
+string BuildTradeTransactionPayload(const int transaction_type,const ulong order_ticket,const ulong deal_ticket,const ulong position_ticket)
+  {
+   string deal_json="null";
+   if(deal_ticket>0 && HistoryDealSelect(deal_ticket))
+     {
+      string symbol=HistoryDealGetString(deal_ticket,DEAL_SYMBOL);
+      deal_json="{\"ticket\":\""+(string)deal_ticket+"\","+
+                "\"orderTicket\":\""+(string)HistoryDealGetInteger(deal_ticket,DEAL_ORDER)+"\","+
+                "\"positionTicket\":\""+(string)HistoryDealGetInteger(deal_ticket,DEAL_POSITION_ID)+"\","+
+                "\"symbol\":\""+EscapeJson(symbol)+"\","+
+                "\"dealType\":"+(string)HistoryDealGetInteger(deal_ticket,DEAL_TYPE)+","+
+                "\"entryType\":"+(string)HistoryDealGetInteger(deal_ticket,DEAL_ENTRY)+","+
+                "\"volumeUnits\":\""+(string)VolumeToUnits(HistoryDealGetDouble(deal_ticket,DEAL_VOLUME))+"\","+
+                "\"pricePoints\":\""+(string)PriceToPoints(symbol,HistoryDealGetDouble(deal_ticket,DEAL_PRICE))+"\","+
+                "\"profitMinor\":\""+(string)MoneyToMinor(HistoryDealGetDouble(deal_ticket,DEAL_PROFIT))+"\","+
+                "\"commissionMinor\":\""+(string)MoneyToMinor(HistoryDealGetDouble(deal_ticket,DEAL_COMMISSION))+"\","+
+                "\"swapMinor\":\""+(string)MoneyToMinor(HistoryDealGetDouble(deal_ticket,DEAL_SWAP))+"\","+
+                "\"feeMinor\":\""+(string)MoneyToMinor(HistoryDealGetDouble(deal_ticket,DEAL_FEE))+"\","+
+                "\"occurredAt\":\""+IsoUtc((datetime)HistoryDealGetInteger(deal_ticket,DEAL_TIME))+"\"}";
+     }
+   return("{\"transactionType\":"+(string)transaction_type+","+
+          "\"orderTicket\":\""+(string)order_ticket+"\","+
+          "\"dealTicket\":\""+(string)deal_ticket+"\","+
+          "\"positionTicket\":\""+(string)position_ticket+"\","+
+          "\"deal\":"+deal_json+"}");
   }
 
 string BuildHeartbeatPayload()

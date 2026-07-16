@@ -46,6 +46,12 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   const { default: worker } = await import(workerUrl.href);
   const firstCookie = await sessionCookie("owner-one@example.com", "Owner One", sessionSecret);
   const secondCookie = await sessionCookie("owner-two@example.com", "Owner Two", sessionSecret);
+  const idleCookie = await sessionCookie("owner-one@example.com", "Owner One", sessionSecret, Date.now() - 31 * 60_000);
+  const idleSession = await api(worker, env, "/api/v1/accounts", { cookie: idleCookie });
+  assert.equal(idleSession.status, 401);
+  const touchedSession = await api(worker, env, "/api/auth/session", { method: "POST", cookie: firstCookie });
+  assert.equal(touchedSession.status, 200);
+  assert.match(touchedSession.headers.get("set-cookie") ?? "", /fundedfence_session=/);
 
   const firstCode = await createPairingCode(worker, env, firstCookie);
   const replacementCode = await createPairingCode(worker, env, firstCookie);
@@ -115,6 +121,24 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   assert.equal(activeDevices.rows[0].active_devices, 1);
   const reconnect = await sendEnvelope(worker, env, replacementPair.accessToken, heartbeatEnvelope(replacementPair, 1, `evt_${replacementPair.deviceId}_1`));
   assert.equal(reconnect.status, 202);
+  const firstReconciliation = await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 2, {
+    positions: [positionPayload("2001", "100000")],
+    pendingOrders: [pendingOrderPayload("3001")],
+  }));
+  assert.equal(firstReconciliation.status, 202);
+  const partialClose = await sendEnvelope(worker, env, replacementPair.accessToken, tradeEnvelope(replacementPair, 3));
+  assert.equal(partialClose.status, 202);
+  const secondReconciliation = await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 4, {
+    positions: [positionPayload("2001", "60000")],
+    pendingOrders: [],
+  }));
+  assert.equal(secondReconciliation.status, 202);
+  const normalizedDeal = await testPool.query("SELECT position_ticket, entry_type, volume_units, profit_minor, commission_minor, swap_minor, fee_minor FROM deals WHERE trading_account_id = $1 AND ticket = '4001'", [paired.accountId]);
+  assert.deepEqual(normalizedDeal.rows[0], { position_ticket: "2001", entry_type: 1, volume_units: "40000", profit_minor: "1250", commission_minor: "-240", swap_minor: "-35", fee_minor: "-10" });
+  const normalizedPosition = await testPool.query("SELECT volume_units FROM positions WHERE trading_account_id = $1 AND ticket = '2001'", [paired.accountId]);
+  assert.equal(normalizedPosition.rows[0].volume_units, "60000");
+  const normalizedOrder = await testPool.query("SELECT closed_at FROM pending_orders WHERE trading_account_id = $1 AND ticket = '3001'", [paired.accountId]);
+  assert.ok(normalizedOrder.rows[0].closed_at);
   const connection = await testPool.query("SELECT state, last_heartbeat_at FROM account_connections WHERE trading_account_id = $1", [paired.accountId]);
   assert.equal(connection.rows[0].state, "live");
   assert.ok(connection.rows[0].last_heartbeat_at);
@@ -171,6 +195,83 @@ function heartbeatEnvelope(pairing, sequence, idempotencyKey) {
   };
 }
 
+function snapshotEnvelope(pairing, sequence, { positions, pendingOrders }) {
+  const now = new Date().toISOString();
+  return {
+    accountId: pairing.accountId,
+    connectorId: pairing.deviceId,
+    eventType: "reconciliation",
+    idempotencyKey: `evt_${pairing.deviceId}_${sequence}`,
+    occurredAt: now,
+    payload: {
+      account: { balanceMinor: "10000000", equityMinor: "10001250", marginMinor: "25000", freeMarginMinor: "9976250", floatingPnlMinor: "1250", serverTime: now },
+      positions,
+      pendingOrders,
+      pendingOrderCount: pendingOrders.length,
+    },
+    protocolVersion: "1.1",
+    sentAt: now,
+    sequence,
+    terminalIdentityHash: "a".repeat(64),
+  };
+}
+
+function positionPayload(ticket, volumeUnits) {
+  return {
+    ticket,
+    symbol: "EURUSD",
+    direction: "buy",
+    volumeUnits,
+    openPricePoints: "110000",
+    currentPricePoints: "110125",
+    stopLossPricePoints: "109500",
+    takeProfitPricePoints: "111000",
+    priceDigits: 5,
+    tickSizePoints: "1",
+    tickValueLossMinorPerLot: "100",
+    swapMinor: "-35",
+    floatingPnlMinor: "1250",
+    openedAt: new Date().toISOString(),
+  };
+}
+
+function pendingOrderPayload(ticket) {
+  return {
+    ticket,
+    symbol: "GBPUSD",
+    orderType: 2,
+    volumeInitialUnits: "50000",
+    volumeCurrentUnits: "50000",
+    openPricePoints: "128000",
+    stopLossPricePoints: "127500",
+    takeProfitPricePoints: "129000",
+    placedAt: new Date().toISOString(),
+    expiresAt: null,
+  };
+}
+
+function tradeEnvelope(pairing, sequence) {
+  const now = new Date().toISOString();
+  return {
+    accountId: pairing.accountId,
+    connectorId: pairing.deviceId,
+    eventType: "trade.transaction",
+    idempotencyKey: `evt_${pairing.deviceId}_${sequence}`,
+    occurredAt: now,
+    payload: {
+      transactionType: 6,
+      orderTicket: "3002",
+      dealTicket: "4001",
+      positionTicket: "2001",
+      deal: { ticket: "4001", orderTicket: "3002", positionTicket: "2001", symbol: "EURUSD", dealType: 1, entryType: 1, volumeUnits: "40000", pricePoints: "110125", profitMinor: "1250", commissionMinor: "-240", swapMinor: "-35", feeMinor: "-10", occurredAt: now },
+    },
+    protocolVersion: "1.1",
+    sentAt: now,
+    sequence,
+    terminalIdentityHash: "a".repeat(64),
+  };
+}
+
 async function sendEnvelope(worker, env, accessToken, envelope) {
   const body = JSON.stringify(envelope);
   const signature = await hmacHex(accessToken, body);
@@ -195,8 +296,8 @@ async function api(worker, env, path, options = {}) {
   return worker.fetch(new Request(`http://localhost${path}`, { method: options.method ?? "GET", headers, body }), env, { waitUntil() {}, passThroughOnException() {} });
 }
 
-async function sessionCookie(email, displayName, secret) {
-  const payload = Buffer.from(JSON.stringify({ email, displayName, expiresAt: Date.now() + 60_000 })).toString("base64url");
+async function sessionCookie(email, displayName, secret, lastActivityAt = Date.now()) {
+  const payload = Buffer.from(JSON.stringify({ email, displayName, expiresAt: Date.now() + 60_000, lastActivityAt })).toString("base64url");
   const signature = Buffer.from(await hmacBytes(secret, payload)).toString("base64url");
   return `fundedfence_session=${payload}.${signature}`;
 }
