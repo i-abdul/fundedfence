@@ -59,7 +59,7 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 - [x] Support daily/static/trailing loss basis, reset timezone, profit targets, trading-day requirements, holding/news restrictions, inactivity, and payout eligibility inputs.
 - [x] Recalculate affected connected accounts when a new version becomes effective without mutating historical results.
 
-## Sprint 3 — drawdown and consistency guardians (implementation complete; deployment pending)
+## Sprint 3 — drawdown and consistency guardians (complete and deployed)
 
 - [x] Add intraday equity/balance, end-of-day equity/balance, static, hybrid, until-initial, and throughout-account trailing models.
 - [x] Record start-of-day and high-watermark state across broker/server timezone boundaries.
@@ -67,8 +67,14 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 - [x] Add best-day, profitable-day, trade-count, lot consistency, and caller-defined payout-period calculations; unsupported risk consistency stays explicitly unknown.
 - [x] Persist normalized source inputs, immutable snapshot/rule/engine calculation records, intermediate values, outputs, and versioned explanations for replay.
 - [x] Replace live-dashboard placeholders with calculated buffers, effective floors, model status, consistency observations, and all-stops scenarios.
-- [ ] Apply the PostgreSQL migration and pass the isolated OCI lifecycle test.
-- [ ] Classify the existing 15K workspace as Free Trial, have the authorized owner approve/activate that profile, and verify the first live calculation.
+- [x] Apply the PostgreSQL migration and pass the isolated OCI lifecycle test.
+- [x] Classify the existing 15K workspace as Free Trial, have the authorized owner approve/activate that profile, and verify the first live calculation.
+
+### Sprint 3 production acceptance
+
+- OCI is running revision `d8ad29a`; the PostgreSQL migration, isolated lifecycle test, public smoke checks, and authentication boundary checks passed.
+- The 15K Free Trial workspace is live on `rulever_fundednext_free_trial_v1`, its recalculation job completed, and immutable Engine 1.0.0 calculations are being persisted from current MT5 snapshots.
+- The production dashboard displays sourced daily/total buffers, effective floors, consistency observations, open-position P&L, and an explicit missing-stop warning without inventing unavailable stop risk.
 
 ## Sprint 4 — daily risk command centre
 

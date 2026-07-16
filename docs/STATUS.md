@@ -1,49 +1,31 @@
-# Implementation status — Sprint 1
+# Implementation status — Sprints 1–3
 
 Updated: 2026-07-16
 
 ## Completed
 
-- Greenfield repository assessment and supported project initialization.
-- Product/MVP, architecture, domain, rule, API, connector, security, threat, testing, deployment, decisions, limitations, and next-loop documentation.
-- Premium landing page, responsive product shell, account-health dashboard, onboarding, pairing diagnostics, rule monitor, sign-in/sign-up/recovery screens.
-- Hosting-managed auth foundation and tenant-scoped live-account API.
-- D1 schema for core identity, rules, account, connector, snapshot, position, event, alert, and audit entities.
-- Pairing-code issuance, source throttling, device pairing, short-lived/refresh credentials, signature verification, replay control, idempotency, reconciliation path, and live-state read API.
-- Exact daily/maximum/trailing drawdown kernel and position-risk foundation.
-- Read-only `.mq5` prototype with pairing, snapshots, heartbeats, trade callbacks, HMAC, token refresh, backoff, and offline buffer.
-- Persistent connector credentials and sequence recovery across MT5 restarts.
-- Pairing/account recovery across browser refreshes and duplicated tabs.
-- Pairing-code countdown, expiry state, and replacement invalidation.
-- Live dashboard binding for account identity, balance, equity, positions, heartbeat, snapshot, and freshness.
-- Protection values disabled for live accounts until an approved rule profile is available.
+- Sprint 1: authenticated MT5 pairing, durable connector credentials, live/delayed/offline monitoring, PostgreSQL lifecycle coverage, session timeout, automatic post-pair redirect, and responsive/readable public and dashboard pages.
+- Sprint 2: sourced and versioned FundedNext rule catalog with independent approval, activation, supersession, rollback, account assignment, and recalculation workflow.
+- Sprint 3: generalized drawdown guardians, high-water/reset state, consistency observations, what-if simulations, immutable calculation records, and live dashboard risk output.
+- Ten FundedNext program/phase profiles are effective, including Free Trial v1 and Stellar Instant v2.
+- The OCI Docker deployment runs the application, connection monitor, PostgreSQL, and Caddy; production revision `d8ad29a` passed migration, lifecycle, public-route, and authentication checks.
 
-## Verification state
+## Live acceptance
 
-- Starter baseline production build and two starter tests passed before replacement.
-- Nine deterministic domain/security tests pass: drawdown, trail lock, breach status, pairing, token scope, HMAC tamper detection, and offline/replay semantics.
-- Strict TypeScript checking passes.
-- ESLint passes across application, components, domain/server modules, database, worker, tests, and configuration.
-- The 17-table D1 migration was generated and inspected.
-- The production Vinext build passes with public, dynamic, and API routes classified.
-- Rendered worker integration tests pass for landing/dashboard content, security headers, preview provenance, and starter removal; anonymous API-denial coverage is included.
-- Browser journey passes: landing -> onboarding -> required rule confirmation -> pairing diagnostics.
-- Mobile dashboard passes at 390 x 844: desktop sidebar hidden, mobile navigation shown, illustrative banner present, and document width equals scroll width.
-- Connector static safety scan finds no order-send/trade-class/modify/close calls and confirms transaction, WebRequest, HMAC, and buffer capabilities.
-- MetaEditor compile and live MT5 terminal tests are not available in this workspace and are not claimed.
+- The connected 15K FundedNext Free Trial MT5 workspace is live and assigned to `rulever_fundednext_free_trial_v1`.
+- Rule recalculation completed and Engine 1.0.0 is persisting healthy immutable calculations from fresh snapshots.
+- The dashboard shows current balance/equity, daily and total buffers, effective floors, open positions, and explicit unknown/missing-stop risk states.
+- The authenticated simulation lifecycle covers withdrawals, gap reserves, payout periods, consistency calculations, recalculation completion, and tenant isolation.
 
-## Product data status
+## Verification
 
-- No live prop-firm rules are approved.
-- No connector is paired in the visible preview.
-- Dashboard values and restriction warnings are explicitly illustrative.
+- TypeScript, ESLint, 25 unit/domain tests, five rendered-route tests, and the production build pass locally.
+- The isolated OCI PostgreSQL lifecycle test passes against the deployed image.
+- Public homepage returns 200 and the unauthenticated Rules API returns 401.
+- The connector remains read-only; static safety checks find no order placement, modification, or closing calls.
 
-## Risks
+## Next sprint
 
-- Financial correctness is proven only for the first illustrative formula variant.
-- Cross-language connector signing still needs compiled test vectors.
-- Production operations, legal/privacy controls, admin review, and alert reliability remain incomplete.
+Sprint 4 adds saved daily risk plans, prioritized risk actions, stop-loss and combined-exposure checks, escalation patterns, reset proximity, and explainable health components.
 
-## Next loop
-
-Compile and terminal-test the EA, add isolated-D1 connector integration tests, bind the dashboard to live state/SSE, implement stale protection warnings, and then build the protected rule-review workflow.
+Strategic expansion beyond the current FundedNext validation target will be reviewed before Sprint 4 scope is finalized.
