@@ -1,4 +1,7 @@
 const PAIRING_CODE_PATTERN = /^\d{6}$/;
+export const PAIRING_CODE_TTL_MS = 10 * 60 * 1000;
+
+export type PairingCodeStatus = "active" | "used" | "expired";
 
 export function normalizePairingCode(value: string): string {
   const normalized = value.replace(/[\s-]/g, "");
@@ -10,6 +13,12 @@ export function normalizePairingCode(value: string): string {
 
 export function generatePairingCode(randomBytes = crypto.getRandomValues(new Uint32Array(1))): string {
   return (randomBytes[0] % 1_000_000).toString().padStart(6, "0");
+}
+
+export function pairingCodeStatus(expiresAt: string, usedAt: string | null, now = Date.now()): PairingCodeStatus {
+  if (usedAt) return "used";
+  const expiry = Date.parse(expiresAt);
+  return Number.isFinite(expiry) && expiry > now ? "active" : "expired";
 }
 
 export async function hashPairingCode(code: string, pepper: string): Promise<string> {

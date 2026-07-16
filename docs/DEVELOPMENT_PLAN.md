@@ -1,0 +1,88 @@
+# FundedFence development plan
+
+Updated: 2026-07-16
+
+## Delivery principles
+
+- Live account telemetry must be reliable before any risk output is activated.
+- Every firm calculation must reference an immutable, sourced, reviewed rule version.
+- Unknown inputs produce `not calculated`, never an invented estimate.
+- Official rules, operational warnings, and unverified community reports remain separate data classes.
+- The connector remains read-only. It never places, changes, or closes a trade.
+
+## Sprint 1 — trusted live account foundation
+
+Goal: one authenticated user can pair MT5 once, return in another tab or session, and see an accurate live/delayed/offline account state without demo data being mistaken for protection.
+
+### In progress
+
+- [x] Restore the latest active or connected account after refresh and tab duplication.
+- [x] Enforce a visible 10-minute pairing-code countdown and expired state.
+- [x] Invalidate the previous unused code when a replacement is generated.
+- [x] Distinguish paired, live, delayed, offline, and waiting states.
+- [x] Bind dashboard account identity, balance, equity, positions, heartbeat, and snapshot status to live APIs.
+- [x] Disable illustrative risk values when a real account is selected.
+- [x] Show a prominent protection-paused state when telemetry becomes stale.
+
+### Remaining Sprint 1 work
+
+- [ ] Add database-backed integration tests for expiry, reuse, replacement, tenant isolation, reconnect, duplicate events, and out-of-order events.
+- [ ] Add connector/device revocation and an explicit re-pair flow.
+- [ ] Capture symbol digits, point size, tick size, tick value, commission, swap, deals, pending orders, and partial closes.
+- [ ] Calculate auditable open risk at stop-loss from broker contract metadata.
+- [ ] Add a freshness monitor that records offline transitions and creates a connector-paused alert even when the dashboard is closed.
+- [ ] Add account selection for users with more than one connected account.
+- [ ] Complete an end-to-end OCI/MT5 soak test covering restart, token refresh, network interruption, and recovery.
+
+### Sprint 1 acceptance criteria
+
+1. A paired account remains selected after refresh, duplicate tab, sign-out/sign-in, and app restart.
+2. An expired or replaced pairing code cannot pair a connector and the UI never displays it as active.
+3. Dashboard freshness moves from live to delayed to offline at the documented thresholds.
+4. The dashboard never mixes a real account with illustrative risk calculations.
+5. Connector restart resumes with the same device credentials and increasing sequence.
+6. All lifecycle and tenant-isolation tests pass against PostgreSQL.
+
+## Sprint 2 — versioned FundedNext rule profiles
+
+- Model firm, program, phase, account-size applicability, platform, and effective dates.
+- Capture official sources and evidence snapshots.
+- Add draft, validation, independent approval, activation, supersession, and rollback workflow.
+- Implement FundedNext Stellar 2-Step, Stellar 1-Step, Stellar Lite, and Stellar Instant as separately versioned profiles.
+- Support daily/static/trailing loss basis, reset timezone, profit targets, trading-day requirements, holding/news restrictions, inactivity, and payout eligibility inputs.
+- Recalculate affected accounts when a new version becomes effective without mutating historical results.
+
+## Sprint 3 — drawdown and consistency guardians
+
+- Add intraday equity/balance, end-of-day equity/balance, static, hybrid, until-initial, and throughout-account trailing models.
+- Record start-of-day and high-watermark state across broker/server timezone boundaries.
+- Simulate all stops reached, gap reserve, next reset, position close, and withdrawal effects.
+- Add best-day, profitable-day, trade-count, lot/risk consistency, and payout-period calculations.
+- Persist every input, intermediate value, engine version, and explanation for replay.
+
+## Sprint 4 — daily risk command centre
+
+- Add saved daily plans: risk budget, max risk per trade, max trades, loss stop, profit lock, and preservation mode.
+- Add stop-loss missing/moved-away, combined exposure, lot escalation, re-entry, revenge-trading, reset proximity, and market-close checks.
+- Produce prioritized actions with evidence, severity, acknowledgement, and resolution state.
+- Add account-health scoring only after its components and weights are explainable.
+
+## Sprint 5 — news, sessions, and notifications
+
+- Ingest an economic calendar and map events to affected symbols and rule windows.
+- Add authoritative live restriction timers and session/reset countdowns.
+- Add in-app and email notification delivery with retries, deduplication, quiet hours, and delivery audit.
+- Build session-performance analytics from normalized deal history.
+
+## Sprint 6 — simulations and payout readiness
+
+- Add Monte Carlo breach/pass simulations with displayed assumptions and uncertainty.
+- Add payout-readiness checks and withdrawal-impact simulation.
+- Add challenge-purchase historical replay and firm-suitability scoring.
+- Generate dispute evidence packs with trade timeline, snapshots, applied rule version, source evidence, and notifications.
+
+## Later research tracks
+
+- Community Risk Signals with deduplication, age/program separation, firm response, confidence, and human moderation.
+- Official rule-page change detection with human approval before activation.
+- Personalized pre-trade expectancy research only after sufficient user history and out-of-sample validation. Generic buy/sell probabilities remain outside the committed roadmap.

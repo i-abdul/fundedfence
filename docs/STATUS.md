@@ -1,6 +1,6 @@
-# Implementation status — loop 1
+# Implementation status — Sprint 1
 
-Updated: 2026-07-15
+Updated: 2026-07-16
 
 ## Completed
 
@@ -12,6 +12,11 @@ Updated: 2026-07-15
 - Pairing-code issuance, source throttling, device pairing, short-lived/refresh credentials, signature verification, replay control, idempotency, reconciliation path, and live-state read API.
 - Exact daily/maximum/trailing drawdown kernel and position-risk foundation.
 - Read-only `.mq5` prototype with pairing, snapshots, heartbeats, trade callbacks, HMAC, token refresh, backoff, and offline buffer.
+- Persistent connector credentials and sequence recovery across MT5 restarts.
+- Pairing/account recovery across browser refreshes and duplicated tabs.
+- Pairing-code countdown, expiry state, and replacement invalidation.
+- Live dashboard binding for account identity, balance, equity, positions, heartbeat, snapshot, and freshness.
+- Protection values disabled for live accounts until an approved rule profile is available.
 
 ## Verification state
 

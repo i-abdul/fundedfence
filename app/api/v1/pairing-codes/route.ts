@@ -1,10 +1,53 @@
 import { getAppUser } from "@/lib/server/auth";
-import { generatePairingCode, hashPairingCode } from "@/lib/domain/pairing";
+import { generatePairingCode, hashPairingCode, pairingCodeStatus, PAIRING_CODE_TTL_MS } from "@/lib/domain/pairing";
 import { jsonError, safeJson } from "@/lib/server/http";
 import { stableId } from "@/lib/server/crypto";
 import { requireDatabase, requireSecret } from "@/lib/server/runtime";
 
 export const dynamic = "force-dynamic";
+
+type AccountRow = {
+  account_id: string;
+  label: string;
+  status: string;
+  connection_state: string | null;
+  last_heartbeat_at: string | null;
+  last_snapshot_at: string | null;
+};
+
+type PairingRow = AccountRow & {
+  expires_at: string;
+  used_at: string | null;
+};
+
+export async function GET(): Promise<Response> {
+  const correlationId = crypto.randomUUID();
+  try {
+    const user = await getAppUser();
+    if (!user) return jsonError(401, "authentication_required", "Sign in to view pairing status.", correlationId);
+    const database = await requireDatabase();
+    const email = user.email.toLowerCase();
+    const latestPairing = await database.prepare(
+      "SELECT ta.id AS account_id, ta.label, ta.status, ac.state AS connection_state, ac.last_heartbeat_at, ac.last_snapshot_at, pc.expires_at, pc.used_at FROM pairing_codes pc JOIN trading_accounts ta ON ta.id = pc.trading_account_id JOIN users u ON u.id = ta.owner_user_id LEFT JOIN account_connections ac ON ac.trading_account_id = ta.id WHERE u.email = ? ORDER BY pc.created_at DESC LIMIT 1",
+    ).bind(email).first<PairingRow>();
+    const latestConnectedAccount = await database.prepare(
+      "SELECT ta.id AS account_id, ta.label, ta.status, ac.state AS connection_state, ac.last_heartbeat_at, ac.last_snapshot_at FROM trading_accounts ta JOIN users u ON u.id = ta.owner_user_id LEFT JOIN account_connections ac ON ac.trading_account_id = ta.id WHERE u.email = ? AND ta.status = 'connected' ORDER BY COALESCE(ac.last_heartbeat_at, ta.updated_at) DESC LIMIT 1",
+    ).bind(email).first<AccountRow>();
+    const status = latestPairing ? pairingCodeStatus(latestPairing.expires_at, latestPairing.used_at) : null;
+    const trackedAccount = status === "active" ? latestPairing : latestConnectedAccount ?? latestPairing;
+
+    return Response.json({
+      trackedAccount: trackedAccount ? publicAccount(trackedAccount) : null,
+      latestPairing: latestPairing ? {
+        accountId: latestPairing.account_id,
+        expiresAt: latestPairing.expires_at,
+        status,
+      } : null,
+    });
+  } catch {
+    return jsonError(503, "pairing_status_unavailable", "Pairing status is temporarily unavailable.", correlationId);
+  }
+}
 
 export async function POST(request: Request): Promise<Response> {
   const correlationId = crypto.randomUUID();
@@ -33,13 +76,15 @@ export async function POST(request: Request): Promise<Response> {
     const pairingId = `pair_${crypto.randomUUID().replace(/-/g, "")}`;
     const code = generatePairingCode();
     const codeHash = await hashPairingCode(code, pepper);
-    const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
+    const expiresAt = new Date(now.getTime() + PAIRING_CODE_TTL_MS).toISOString();
 
     await database.batch([
       database.prepare("INSERT OR IGNORE INTO organizations (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)")
         .bind(organizationId, `${user.displayName}'s workspace`, nowIso, nowIso),
       database.prepare("INSERT OR IGNORE INTO users (id, organization_id, email, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(userId, organizationId, user.email.toLowerCase(), user.displayName, nowIso, nowIso),
+      database.prepare("UPDATE pairing_codes SET expires_at = ?, updated_at = ? WHERE owner_user_id = ? AND used_at IS NULL AND expires_at > ?")
+        .bind(nowIso, nowIso, userId, nowIso),
       database.prepare("INSERT INTO trading_accounts (id, organization_id, owner_user_id, program_id, rule_version_id, label, account_size_minor, currency, status, created_at, updated_at) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, 'pairing', ?, ?)")
         .bind(accountId, organizationId, userId, `${accountLabel} · ${firmLabel} ${programLabel}`, accountSizeMinor, currency, nowIso, nowIso),
       database.prepare("INSERT INTO pairing_codes (id, trading_account_id, owner_user_id, code_hash, expires_at, used_at, attempts_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, 5, ?, ?)")
@@ -52,6 +97,17 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     return jsonError(400, "pairing_code_not_created", publicMessage(error), correlationId);
   }
+}
+
+function publicAccount(row: AccountRow) {
+  return {
+    accountId: row.account_id,
+    label: row.label,
+    status: row.status,
+    connectionState: row.connection_state,
+    lastHeartbeatAt: row.last_heartbeat_at,
+    lastSnapshotAt: row.last_snapshot_at,
+  };
 }
 
 function requiredText(value: unknown, field: string, maxLength: number): string {

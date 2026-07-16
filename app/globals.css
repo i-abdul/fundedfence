@@ -185,6 +185,10 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .phase-pill { background: #101f19; color: #84958c; }
 .live-state { align-items: center; color: var(--mint); display: flex; font-size: 9px; gap: 7px; margin-left: auto; }
 .live-state > span { background: var(--mint-strong); border-radius: 50%; box-shadow: 0 0 0 4px rgba(99,214,156,.08); height: 6px; width: 6px; }
+.live-state.delayed { color: var(--amber); }
+.live-state.delayed > span { background: var(--amber); box-shadow: 0 0 0 4px rgba(232,197,122,.08); }
+.live-state.offline { color: #e99a9a; }
+.live-state.offline > span { background: #e99a9a; box-shadow: 0 0 0 4px rgba(233,154,154,.08); }
 .live-state small { color: #5f7067; margin-left: 6px; }
 .panel { background: linear-gradient(145deg, #0e1b16, #0b1712); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: inset 0 1px rgba(255,255,255,.015); }
 .panel-heading { align-items: flex-start; display: flex; justify-content: space-between; }
@@ -196,6 +200,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .health-panel, .balance-panel { min-height: 245px; padding: 22px; }
 .health-content { align-items: center; display: grid; gap: 28px; grid-template-columns: 148px 1fr; margin-top: 19px; }
 .risk-ring { align-items: center; background: conic-gradient(var(--mint-strong) 0 78%, rgba(255,255,255,.06) 78% 100%); border-radius: 50%; display: flex; height: 138px; justify-content: center; position: relative; width: 138px; }
+.risk-ring.pending { background: conic-gradient(rgba(232,197,122,.2) 0 12%, rgba(255,255,255,.06) 12% 100%); }
 .risk-ring::before { background: #0d1914; border: 1px solid rgba(255,255,255,.025); border-radius: 50%; content: ""; height: 112px; position: absolute; width: 112px; }
 .risk-ring > div { position: relative; text-align: center; }
 .risk-ring strong { font-size: 36px; font-weight: 520; letter-spacing: -.06em; }

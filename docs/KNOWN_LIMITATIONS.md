@@ -2,11 +2,11 @@
 
 - No real prop-firm program or official rule source is loaded. All displayed figures are illustrative and cannot protect a live account.
 - The EA source has not been compiled in MetaEditor or exercised in an MT5 terminal in this workspace.
-- EA credentials are memory-only. Terminal restart requires a new pairing code until Windows-protected persistence is implemented.
+- EA credentials currently use an MT5 common data file. Operating-system protected secret storage remains future hardening work.
 - The manual `.mq5` download is not a code-signed `.ex5` or Windows installer.
 - Pending orders and completed deals remain in raw events; normalized `Order` and `Deal` tables are not yet implemented.
 - API routes have unit/static coverage but not yet isolated-D1 integration coverage.
-- The dashboard renders illustrative data; authenticated live-state binding/SSE is not yet connected to the visual dashboard component.
+- The dashboard polls authenticated live state every five seconds; SSE/reconnect reconciliation is not yet implemented.
 - Connection state is derived on reads; no scheduled stale/offline transition or critical offline notification exists.
 - Admin rule management, independent approval, rollback, affected-account recalculation, and audit export UI are not implemented.
 - Consistency, news/session restrictions, notifications, simulation, behavioral risk, community intelligence, subscription, deletion/export, and support cases are planned only.

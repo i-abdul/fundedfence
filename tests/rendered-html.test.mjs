@@ -71,6 +71,10 @@ test("denies account data and pairing-code creation without browser identity", a
   assert.equal(accountResponse.status, 401);
   assert.match(await accountResponse.text(), /authentication_required/);
 
+  const pairingStatusResponse = await render("/api/v1/pairing-codes");
+  assert.equal(pairingStatusResponse.status, 401);
+  assert.match(await pairingStatusResponse.text(), /authentication_required/);
+
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-pairing-denial`);
   const { default: worker } = await import(workerUrl.href);
