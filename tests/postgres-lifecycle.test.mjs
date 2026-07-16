@@ -59,6 +59,9 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
 
   const firstCode = await createPairingCode(worker, env, firstCookie);
   const replacementCode = await createPairingCode(worker, env, firstCookie);
+  assert.equal(replacementCode.accountId, firstCode.accountId);
+  assert.equal(replacementCode.reusingWorkspace, true);
+  assert.equal(replacementCode.replacingDevice, false);
   const replacedAttempt = await pairConnector(worker, env, firstCode.pairingCode);
   assert.equal(replacedAttempt.status, 401);
   assert.match(await replacedAttempt.text(), /pairing_rejected/);

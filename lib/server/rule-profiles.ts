@@ -296,7 +296,7 @@ async function workflowVersion(database: AppDatabase, versionId: string): Promis
 }
 
 async function assignableAccounts(database: AppDatabase, programId: string, sizes: string[]): Promise<AccountAssignmentRow[]> {
-  const rows = await database.prepare("SELECT id, account_size_minor, rule_version_id FROM trading_accounts WHERE program_id = ?")
+  const rows = await database.prepare("SELECT id, account_size_minor, rule_version_id FROM trading_accounts WHERE program_id = ? AND status = 'connected'")
     .bind(programId).all<AccountAssignmentRow>();
   return rows.results.filter((row) => sizes.includes(row.account_size_minor));
 }

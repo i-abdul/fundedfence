@@ -26,6 +26,7 @@ type OwnedAccountRow = {
   id: string;
   organization_id: string;
   owner_user_id: string;
+  status: string;
 };
 
 type ActiveRuleRow = {
@@ -91,14 +92,16 @@ export async function POST(request: Request): Promise<Response> {
     const userId = await stableId("usr", user.email.toLowerCase());
     const organizationId = await stableId("org", user.email.toLowerCase());
     const ownedAccount = requestedAccountId
-      ? await database.prepare("SELECT ta.id, ta.organization_id, ta.owner_user_id FROM trading_accounts ta JOIN users u ON u.id = ta.owner_user_id WHERE ta.id = ? AND u.email = ? LIMIT 1")
+      ? await database.prepare("SELECT ta.id, ta.organization_id, ta.owner_user_id, ta.status FROM trading_accounts ta JOIN users u ON u.id = ta.owner_user_id WHERE ta.id = ? AND u.email = ? LIMIT 1")
         .bind(requestedAccountId, user.email.toLowerCase()).first<OwnedAccountRow>()
-      : null;
+      : await database.prepare("SELECT ta.id, ta.organization_id, ta.owner_user_id, ta.status FROM trading_accounts ta JOIN users u ON u.id = ta.owner_user_id WHERE u.email = ? AND ta.status = 'pairing' AND ta.program_id = ? AND ta.account_size_minor = ? ORDER BY ta.updated_at DESC LIMIT 1")
+        .bind(user.email.toLowerCase(), ruleProfile.programId, accountSizeMinor).first<OwnedAccountRow>();
     if (requestedAccountId && !ownedAccount) throw new Error("The account is not available for re-pairing.");
     const accountId = ownedAccount?.id ?? `acct_${crypto.randomUUID().replace(/-/g, "")}`;
     const accountOrganizationId = ownedAccount?.organization_id ?? organizationId;
     const accountOwnerUserId = ownedAccount?.owner_user_id ?? userId;
-    const replacingDevice = Boolean(ownedAccount);
+    const replacingDevice = ownedAccount?.status === "connected";
+    const reusingWorkspace = Boolean(ownedAccount && !requestedAccountId && !replacingDevice);
     const activeRule = await database.prepare("SELECT rv.id FROM rule_sets rs JOIN rule_versions rv ON rv.id = rs.active_version_id WHERE rs.program_id = ? AND rv.verification_status = 'effective' LIMIT 1")
       .bind(ruleProfile.programId).first<ActiveRuleRow>();
     const pairingId = `pair_${crypto.randomUUID().replace(/-/g, "")}`;
@@ -116,17 +119,22 @@ export async function POST(request: Request): Promise<Response> {
       database.prepare("INSERT INTO pairing_codes (id, trading_account_id, owner_user_id, code_hash, expires_at, used_at, attempts_remaining, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NULL, 5, ?, ?)")
         .bind(pairingId, accountId, accountOwnerUserId, codeHash, expiresAt, nowIso, nowIso),
       database.prepare("INSERT INTO audit_events (id, organization_id, trading_account_id, actor_type, actor_id, event_type, occurred_at, correlation_id, payload_json, previous_hash, event_hash) VALUES (?, ?, ?, 'user', ?, ?, ?, ?, ?, NULL, ?)")
-        .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, accountOrganizationId, accountId, accountOwnerUserId, replacingDevice ? "connector.repair_requested" : "pairing.code_created", nowIso, correlationId, JSON.stringify({ expiresAt, firmId, firmLabel, programId, programLabel, phase, platform, accountPrice }), codeHash),
+        .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, accountOrganizationId, accountId, accountOwnerUserId, replacingDevice ? "connector.repair_requested" : reusingWorkspace ? "pairing.code_replaced" : "pairing.code_created", nowIso, correlationId, JSON.stringify({ expiresAt, firmId, firmLabel, programId, programLabel, phase, platform, accountPrice }), codeHash),
     ];
-    if (replacingDevice) {
-      statements.splice(3, 0,
-        database.prepare("UPDATE connector_devices SET revoked_at = COALESCE(revoked_at, ?), updated_at = ? WHERE trading_account_id = ? AND revoked_at IS NULL")
-          .bind(nowIso, nowIso, accountId),
-        database.prepare("UPDATE account_connections SET state = 'reconnecting', last_heartbeat_at = NULL, connector_version = NULL, updated_at = ? WHERE trading_account_id = ?")
-          .bind(nowIso, accountId),
+    if (ownedAccount) {
+      const accountStatements = [
         database.prepare("UPDATE trading_accounts SET program_id = ?, rule_version_id = ?, label = ?, account_size_minor = ?, currency = ?, status = 'pairing', updated_at = ? WHERE id = ?")
           .bind(ruleProfile.programId, activeRule?.id ?? null, `${accountLabel} · ${firmLabel} ${programLabel}`, accountSizeMinor, currency, nowIso, accountId),
-      );
+      ];
+      if (replacingDevice) {
+        accountStatements.unshift(
+          database.prepare("UPDATE connector_devices SET revoked_at = COALESCE(revoked_at, ?), updated_at = ? WHERE trading_account_id = ? AND revoked_at IS NULL")
+            .bind(nowIso, nowIso, accountId),
+          database.prepare("UPDATE account_connections SET state = 'reconnecting', last_heartbeat_at = NULL, connector_version = NULL, updated_at = ? WHERE trading_account_id = ?")
+            .bind(nowIso, accountId),
+        );
+      }
+      statements.splice(3, 0, ...accountStatements);
     } else {
       statements.splice(3, 0,
         database.prepare("INSERT INTO trading_accounts (id, organization_id, owner_user_id, program_id, rule_version_id, label, account_size_minor, currency, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pairing', ?, ?)")
@@ -135,7 +143,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     await database.batch(statements);
 
-    return Response.json({ pairingCode: code, expiresAt, accountId, singleUse: true, replacingDevice }, { status: 201 });
+    return Response.json({ pairingCode: code, expiresAt, accountId, singleUse: true, replacingDevice, reusingWorkspace }, { status: 201 });
   } catch (error) {
     return jsonError(400, "pairing_code_not_created", publicMessage(error), correlationId);
   }
