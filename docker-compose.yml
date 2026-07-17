@@ -33,7 +33,7 @@ services:
       POSTGRES_USER: fundedfence
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - fundedfence_postgres:/var/lib/postgresql/data
+      - ${FUNDEDFENCE_POSTGRES_VOLUME:-fundedfence_postgres}:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fundedfence -d fundedfence"]
       interval: 10s

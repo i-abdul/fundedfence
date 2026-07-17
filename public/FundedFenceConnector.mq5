@@ -4,7 +4,7 @@
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
 #property copyright "FundedFence"
-#property version   "001.004"
+#property version   "001.005"
 #property strict
 #property description "Read-only signed account-data connector for FundedFence."
 
@@ -16,7 +16,7 @@ input int    IdleSnapshotSeconds = 15;
 input int    RequestTimeoutMs = 1800;
 input int    CurrencyExponent = 2;
 
-string CONNECTOR_VERSION = "0.4.0";
+string CONNECTOR_VERSION = "0.4.1";
 string PROTOCOL_VERSION = "1.1";
 string BUFFER_FILE = "FundedFenceConnector/pending-events-v1-1.jsonl";
 string CREDENTIALS_FILE = "FundedFenceConnector/credentials.tsv";
@@ -420,7 +420,8 @@ void FlushBufferedEvents()
      {
       string envelope=FileReadString(input_handle);
       if(envelope=="") continue;
-      bool sent=(!blocked && SendEnvelope(envelope));
+      string send_envelope=RefreshEnvelopeSentAt(envelope);
+      bool sent=(!blocked && SendEnvelope(send_envelope));
       if(g_device_id=="")
         {
          FileClose(input_handle);
@@ -445,6 +446,17 @@ void FlushBufferedEvents()
          FileClose(output);
         }
      }
+  }
+
+string RefreshEnvelopeSentAt(string envelope)
+  {
+   string marker="\"sentAt\":\"";
+   int start=StringFind(envelope,marker);
+   if(start<0) return(envelope);
+   start+=StringLen(marker);
+   int finish=StringFind(envelope,"\"",start);
+   if(finish<0) return(envelope);
+   return(StringSubstr(envelope,0,start)+IsoUtc(TimeGMT())+StringSubstr(envelope,finish));
   }
 
 string HmacSha256Hex(const string key_text,const string message)
