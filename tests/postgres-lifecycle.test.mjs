@@ -185,7 +185,7 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   assert.equal(liveRiskPayload.riskCalculation.ruleVersionId, ruleVersionId);
   assert.equal(liveRiskPayload.commandCentre.news.availability, "calculated");
   assert.equal(liveRiskPayload.commandCentre.news.nextEvent.title, "US CPI");
-  assert.deepEqual(liveRiskPayload.commandCentre.news.nextEvent.affectedSymbols, ["EURUSD"]);
+  assert.deepEqual(liveRiskPayload.commandCentre.news.nextEvent.affectedSymbols, ["EURUSD", "GBPUSD"]);
   assert.equal(liveRiskPayload.commandCentre.news.nextEvent.qualification, "unverified");
   const savedPlan = await api(worker, env, `/api/v1/accounts/${paired.accountId}/daily-plan`, { method: "PUT", cookie: firstCookie, body: { riskBudgetMinor: "100000", maxRiskPerTradeMinor: "60000", maxTrades: 2, lossStopMinor: "50000", profitLockMinor: "75000", preservationMode: "profit-lock" } });
   assert.equal(savedPlan.status, 200);
