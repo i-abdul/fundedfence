@@ -198,7 +198,8 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   assert.ok(plannedPayload.riskActions.some((action) => action.type === "exposure.trade-limit"));
   assert.ok(plannedPayload.riskActions.some((action) => action.type === "exposure.combined"));
   assert.equal(plannedPayload.commandCentre.news.availability, "calculated");
-  assert.equal(plannedPayload.commandCentre.sessions.availability, "unknown");
+  assert.equal(plannedPayload.commandCentre.sessions.availability, "calculated");
+  assert.deepEqual(plannedPayload.commandCentre.sessions.symbols.map((row) => [row.symbol, row.isOpen]), [["EURUSD", true], ["GBPUSD", true]]);
   assert.equal(plannedPayload.commandCentre.notifications.activeCount >= 2, true);
   assert.equal(plannedPayload.commandCentre.tradingDay.historyComplete, false);
   const action = plannedPayload.riskActions[0];
@@ -320,6 +321,8 @@ function heartbeatEnvelope(pairing, sequence, idempotencyKey) {
 
 function snapshotEnvelope(pairing, sequence, { positions, pendingOrders }) {
   const now = new Date().toISOString();
+  const dayOfWeek = new Date(now).getUTCDay();
+  const symbolSessions = [...new Set([...positions, ...pendingOrders].map((item) => item.symbol))].map((symbol) => ({ symbol, dayOfWeek, fromSeconds: 0, toSeconds: 0 }));
   return {
     accountId: pairing.accountId,
     connectorId: pairing.deviceId,
@@ -331,6 +334,7 @@ function snapshotEnvelope(pairing, sequence, { positions, pendingOrders }) {
       positions,
       pendingOrders,
       pendingOrderCount: pendingOrders.length,
+      symbolSessions,
     },
     protocolVersion: "1.1",
     sentAt: now,

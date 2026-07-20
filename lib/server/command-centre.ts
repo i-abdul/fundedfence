@@ -1,5 +1,6 @@
 import { freshBrokerResetSeconds } from "@/lib/domain/daily-risk";
 import { ECONOMIC_CALENDAR_PROVIDER, mapCanonicalFxSymbol } from "@/lib/domain/economic-calendar";
+import { calculateBrokerSessions, validateBrokerSessions } from "@/lib/domain/broker-sessions";
 import { validateRuleDefinition, type RuleDefinition } from "@/lib/domain/rule-profile";
 import type { AppDatabase } from "./database";
 
@@ -10,7 +11,7 @@ export async function buildCommandCentre(database: AppDatabase, input: {
   ruleVersionId: string | null;
   resetKey: string | null;
   freshness: Freshness;
-  snapshot: { observedAt: string; equityMinor: string; serverTime: string } | null;
+  snapshot: { observedAt: string; equityMinor: string; serverTime: string; symbolSessions?: unknown } | null;
   dealHistoryComplete: boolean;
 }): Promise<Record<string, unknown>> {
   const generatedAtMs = Date.now();
@@ -27,11 +28,7 @@ export async function buildCommandCentre(database: AppDatabase, input: {
   return {
     generatedAt,
     news,
-    sessions: {
-      availability: "unknown",
-      reason: "The connector does not yet supply authoritative broker symbol sessions.",
-      nextTransition: null,
-    },
+    sessions: marketSessions(input.snapshot, input.freshness, generatedAtMs),
     tradingDay: {
       availability: resetSeconds === null ? "unknown" : "calculated",
       reason: resetSeconds === null ? "A fresh broker-server snapshot is required for the reset countdown." : "Countdown uses the latest fresh broker-server clock.",
@@ -52,6 +49,20 @@ export async function buildCommandCentre(database: AppDatabase, input: {
       rows: [],
     },
   };
+}
+
+function marketSessions(snapshot: { observedAt: string; serverTime: string; symbolSessions?: unknown } | null, freshness: Freshness, generatedAtMs: number): Record<string, unknown> {
+  if (!snapshot || freshness !== "live" || snapshot.symbolSessions === undefined) return { availability: "unknown", reason: "A fresh snapshot from connector 0.5 or newer is required for broker sessions.", symbols: [], nextTransition: null };
+  try {
+    const sessions = validateBrokerSessions(snapshot.symbolSessions);
+    if (!sessions.length) return { availability: "calculated", reason: "No open positions or pending orders require a broker-session timer.", symbols: [], nextTransition: null };
+    const state = calculateBrokerSessions(sessions, snapshot.serverTime, snapshot.observedAt, generatedAtMs);
+    return state
+      ? { availability: "calculated", reason: "Times come from authoritative MT5 symbol trading sessions and the fresh broker clock.", ...state }
+      : { availability: "unknown", reason: "A fresh broker snapshot is required for session timing.", symbols: [], nextTransition: null };
+  } catch {
+    return { availability: "unknown", reason: "The broker session payload could not be validated.", symbols: [], nextTransition: null };
+  }
 }
 
 async function marketNews(database: AppDatabase, accountId: string, generatedAt: string, rule: RuleDefinition | null): Promise<Record<string, unknown>> {

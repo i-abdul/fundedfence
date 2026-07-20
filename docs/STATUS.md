@@ -1,6 +1,6 @@
-# Implementation status — Sprints 1–4
+# Implementation status — Sprints 1–5
 
-Updated: 2026-07-19
+Updated: 2026-07-20
 
 ## Completed
 
@@ -9,7 +9,7 @@ Updated: 2026-07-19
 - Sprint 3: generalized drawdown guardians, high-water/reset state, consistency observations, what-if simulations, immutable calculation records, and live dashboard risk output.
 - Sprint 4 foundation: saved daily plans, prioritized evidence-backed risk actions, action lifecycle/history, and command-centre dashboard controls.
 - Ten FundedNext program/phase profiles are effective, including Free Trial v1 and Stellar Instant v2.
-- The OCI Docker deployment runs the application, connection monitor, PostgreSQL, and Caddy; production revision `d8ad29a` passed migration, lifecycle, public-route, and authentication checks.
+- The OCI Docker deployment runs the application, connection monitor, calendar monitor, PostgreSQL, and Caddy; production revision `b7ee92c` passed migration, lifecycle, calendar-sync, public-route, and authentication checks.
 
 ## Live acceptance
 
@@ -20,7 +20,7 @@ Updated: 2026-07-19
 
 ## Verification
 
-- TypeScript, ESLint, 35 unit/domain tests, six rendered-route tests, and the production build pass locally.
+- TypeScript, ESLint, 36 unit/domain tests, six rendered-route tests, and the production build pass locally.
 - The isolated OCI PostgreSQL lifecycle test passes against the deployed image.
 - Public homepage returns 200 and the unauthenticated Rules API returns 401.
 - The connector remains read-only; static safety checks find no order placement, modification, or closing calls.
@@ -29,6 +29,6 @@ Updated: 2026-07-19
 
 Sprint 4 now includes saved broker-day risk plans, deterministic stop/exposure/discipline/timing actions, lifecycle controls, and command-centre warning history. Market-close checks remain explicitly unknown until authoritative symbol sessions arrive, and health scoring remains withheld until component weights are approved.
 
-Sprint 5 has started locally with a server-derived command-centre strip, an opt-in unverified Faireconomy calendar monitor, revision evidence, exact canonical-FX event matching, snapshot-aged reset/news countdowns, active alert notifications, and explicit unknown states for deal history, broker sessions, and named-session analytics. Firm rule windows remain disabled until FundedNext event qualification is reviewed; email remains blocked on delivery-provider configuration.
+Sprint 5 includes a server-derived command-centre strip, an opt-in unverified Faireconomy calendar monitor, revision evidence, exact canonical-FX event matching, snapshot-aged reset/news countdowns, and active alert notifications. Connector 0.5.0 now adds authoritative MT5 trading sessions for open and pending symbols; the local command centre derives open/closed state and the next transition only while that broker snapshot is fresh. Firm rule windows remain disabled until FundedNext event qualification is reviewed; named-session analytics and email remain blocked on definitions and delivery-provider configuration.
 
 Strategic expansion beyond the current FundedNext validation target will be reviewed before Sprint 5 scope is finalized.

@@ -11,6 +11,7 @@ import { isCanonicalMinorUnits, jsonError, readBearerToken } from "@/lib/server/
 import { requireDatabase, requireSecret } from "@/lib/server/runtime";
 import { buildRiskCalculationStatements } from "@/lib/server/risk-engine";
 import { buildDailyRiskActionStatements } from "@/lib/server/daily-risk";
+import { validateBrokerSessions } from "@/lib/domain/broker-sessions";
 
 type DeviceRow = {
   trading_account_id: string;
@@ -89,6 +90,7 @@ export async function POST(request: Request): Promise<Response> {
 
     if (envelope.eventType === "account.snapshot" || envelope.eventType === "reconciliation") {
       const account = parseSnapshotAccount(envelope.payload.account);
+      if (envelope.payload.symbolSessions !== undefined) validateBrokerSessions(envelope.payload.symbolSessions);
       const snapshotId = `snap_${crypto.randomUUID().replace(/-/g, "")}`;
       statements.push(
         database.prepare("INSERT INTO account_snapshots (id, trading_account_id, connector_device_id, sequence, observed_at, balance_minor, equity_minor, margin_minor, free_margin_minor, floating_pnl_minor, server_time, raw_payload_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")

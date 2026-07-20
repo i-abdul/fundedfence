@@ -4,7 +4,7 @@
 //| or closes trades.                                                |
 //+------------------------------------------------------------------+
 #property copyright "FundedFence"
-#property version   "001.005"
+#property version   "001.006"
 #property strict
 #property description "Read-only signed account-data connector for FundedFence."
 
@@ -16,7 +16,7 @@ input int    IdleSnapshotSeconds = 15;
 input int    RequestTimeoutMs = 1800;
 input int    CurrencyExponent = 2;
 
-string CONNECTOR_VERSION = "0.4.1";
+string CONNECTOR_VERSION = "0.5.0";
 string PROTOCOL_VERSION = "1.1";
 string BUFFER_FILE = "FundedFenceConnector/pending-events-v1-1.jsonl";
 string CREDENTIALS_FILE = "FundedFenceConnector/credentials.tsv";
@@ -205,6 +205,7 @@ bool PairConnector()
 
 string BuildSnapshotPayload()
   {
+   string session_symbols[];
    string positions="[";
    bool first=true;
    for(int i=0;i<PositionsTotal();i++)
@@ -212,7 +213,8 @@ string BuildSnapshotPayload()
       ulong ticket=PositionGetTicket(i);
       if(ticket==0 || !PositionSelectByTicket(ticket))
          continue;
-      string symbol=PositionGetString(POSITION_SYMBOL);
+       string symbol=PositionGetString(POSITION_SYMBOL);
+       AddUniqueSymbol(session_symbols,symbol);
       int price_digits=(int)SymbolInfoInteger(symbol,SYMBOL_DIGITS);
       long tick_size_points=PriceToPoints(symbol,SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_SIZE));
       double tick_value_loss=SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_VALUE_LOSS);
@@ -248,7 +250,8 @@ string BuildSnapshotPayload()
       ulong order_ticket=OrderGetTicket(order_index);
       if(order_ticket==0 || !OrderSelect(order_ticket))
          continue;
-      string order_symbol=OrderGetString(ORDER_SYMBOL);
+       string order_symbol=OrderGetString(ORDER_SYMBOL);
+       AddUniqueSymbol(session_symbols,order_symbol);
       datetime expiration=(datetime)OrderGetInteger(ORDER_TIME_EXPIRATION);
       if(!first) pending_orders+=",";
       first=false;
@@ -263,7 +266,8 @@ string BuildSnapshotPayload()
                       "\"placedAt\":\""+IsoUtc((datetime)OrderGetInteger(ORDER_TIME_SETUP))+"\","+
                       "\"expiresAt\":"+(expiration>0 ? "\""+IsoUtc(expiration)+"\"" : "null")+"}";
      }
-   pending_orders+="]";
+    pending_orders+="]";
+    string symbol_sessions=BuildSymbolSessions(session_symbols);
 
    string account="{\"balanceMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_BALANCE))+"\","
                   "\"equityMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_EQUITY))+"\","
@@ -271,7 +275,43 @@ string BuildSnapshotPayload()
                   "\"freeMarginMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_MARGIN_FREE))+"\","
                   "\"floatingPnlMinor\":\""+(string)MoneyToMinor(AccountInfoDouble(ACCOUNT_PROFIT))+"\","
                   "\"serverTime\":\""+(string)TimeTradeServer()+"\"}";
-   return("{\"account\":"+account+",\"positions\":"+positions+",\"pendingOrders\":"+pending_orders+",\"pendingOrderCount\":"+(string)OrdersTotal()+"}");
+    return("{\"account\":"+account+",\"positions\":"+positions+",\"pendingOrders\":"+pending_orders+",\"pendingOrderCount\":"+(string)OrdersTotal()+",\"symbolSessions\":"+symbol_sessions+"}");
+   }
+
+void AddUniqueSymbol(string &symbols[],const string symbol)
+  {
+   for(int i=0;i<ArraySize(symbols);i++)
+      if(symbols[i]==symbol) return;
+   int count=ArraySize(symbols);
+   ArrayResize(symbols,count+1,16);
+   symbols[count]=symbol;
+  }
+
+string BuildSymbolSessions(string &symbols[])
+  {
+   string sessions="[";
+   bool first=true;
+   for(int symbol_index=0;symbol_index<ArraySize(symbols);symbol_index++)
+      for(int day=0;day<7;day++)
+         for(uint session_index=0;session_index<32;session_index++)
+           {
+            datetime from_time=0;
+            datetime to_time=0;
+            if(!SymbolInfoSessionTrade(symbols[symbol_index],(ENUM_DAY_OF_WEEK)day,session_index,from_time,to_time)) break;
+            MqlDateTime from_parts;
+            MqlDateTime to_parts;
+            TimeToStruct(from_time,from_parts);
+            TimeToStruct(to_time,to_parts);
+            int from_seconds=from_parts.hour*3600+from_parts.min*60+from_parts.sec;
+            int to_seconds=to_parts.hour*3600+to_parts.min*60+to_parts.sec;
+            if(!first) sessions+=",";
+            first=false;
+            sessions+="{\"symbol\":\""+EscapeJson(symbols[symbol_index])+"\","+
+                      "\"dayOfWeek\":"+(string)day+","+
+                      "\"fromSeconds\":"+(string)from_seconds+","+
+                      "\"toSeconds\":"+(string)to_seconds+"}";
+           }
+   return(sessions+"]");
   }
 
 string BuildTradeTransactionPayload(const int transaction_type,const ulong order_ticket,const ulong deal_ticket,const ulong position_ticket)

@@ -1,6 +1,6 @@
 # FundedFence development plan
 
-Updated: 2026-07-16
+Updated: 2026-07-20
 
 ## Delivery principles
 
@@ -89,7 +89,8 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 - [x] Add the first command-centre slice with a snapshot-aged broker-reset countdown, active in-app alerts, and explicit unavailable deal-history/news/session states.
 - [x] Add an explicitly enabled, unverified Faireconomy ingest with current-sync reconciliation, revision evidence, and strict canonical-FX impact mapping.
 - Add reviewed FundedNext event qualification before deriving firm rule windows or alerts.
-- Add authoritative live restriction timers and session/reset countdowns.
+- [x] Add authoritative broker-symbol session and reset countdowns from fresh connector snapshots.
+- Add live FundedNext restriction timers after event qualification is reviewed.
 - Add in-app and email notification delivery with retries, deduplication, quiet hours, and delivery audit.
 - Build session-performance analytics from normalized deal history.
 

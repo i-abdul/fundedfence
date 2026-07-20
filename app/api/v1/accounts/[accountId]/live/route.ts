@@ -36,7 +36,7 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
     const account = await database.prepare("SELECT ta.id, ta.label, ta.account_size_minor, ta.currency, ta.status, ta.rule_version_id, ac.state, ac.last_heartbeat_at, ac.last_snapshot_at, ac.last_trade_event_at, ac.connector_version, ac.risk_calculated_at FROM trading_accounts ta JOIN users u ON u.id = ta.owner_user_id LEFT JOIN account_connections ac ON ac.trading_account_id = ta.id WHERE ta.id = ? AND u.email = ? LIMIT 1")
       .bind(accountId, user.email.toLowerCase()).first<Record<string, unknown>>();
     if (!account) return jsonError(404, "account_not_found", "The account was not found.", correlationId);
-    const snapshot = await database.prepare("SELECT observed_at, balance_minor, equity_minor, margin_minor, free_margin_minor, floating_pnl_minor, server_time FROM account_snapshots WHERE trading_account_id = ? ORDER BY observed_at DESC, id DESC LIMIT 1")
+    const snapshot = await database.prepare("SELECT observed_at, balance_minor, equity_minor, margin_minor, free_margin_minor, floating_pnl_minor, server_time, raw_payload_json FROM account_snapshots WHERE trading_account_id = ? ORDER BY observed_at DESC, id DESC LIMIT 1")
       .bind(accountId).first<Record<string, unknown>>();
     const positionRows = await database.prepare("SELECT ticket, symbol, direction, volume_units, open_price_points, current_price_points, stop_loss_price_points, take_profit_price_points, price_digits, tick_size_points, tick_value_loss_minor_per_lot, swap_minor, floating_pnl_minor, opened_at FROM positions WHERE trading_account_id = ? AND closed_at IS NULL ORDER BY opened_at DESC")
       .bind(accountId).all<PositionRow>();
@@ -63,7 +63,7 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
       ruleVersionId: typeof account.rule_version_id === "string" ? account.rule_version_id : null,
       resetKey,
       freshness: accountFreshness,
-      snapshot: snapshot && typeof snapshot.observed_at === "string" && typeof snapshot.equity_minor === "string" && typeof snapshot.server_time === "string" ? { observedAt: snapshot.observed_at, equityMinor: snapshot.equity_minor, serverTime: snapshot.server_time } : null,
+      snapshot: snapshot && typeof snapshot.observed_at === "string" && typeof snapshot.equity_minor === "string" && typeof snapshot.server_time === "string" ? { observedAt: snapshot.observed_at, equityMinor: snapshot.equity_minor, serverTime: snapshot.server_time, symbolSessions: snapshotSymbolSessions(snapshot.raw_payload_json) } : null,
       dealHistoryComplete: actionAvailability.dealHistory === "calculated",
     });
     return Response.json(
@@ -106,6 +106,11 @@ export async function GET(_request: Request, context: { params: Promise<{ accoun
   } catch {
     return jsonError(503, "live_data_unavailable", "Live account data is temporarily unavailable.", correlationId);
   }
+}
+
+function snapshotSymbolSessions(rawPayload: unknown): unknown {
+  if (typeof rawPayload !== "string") return undefined;
+  try { return (JSON.parse(rawPayload) as Record<string, unknown>).symbolSessions; } catch { return undefined; }
 }
 
 function riskAtStop(position: PositionRow): string | null {
