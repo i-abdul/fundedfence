@@ -78,14 +78,17 @@ Goal: one authenticated user can pair MT5 once, return in another tab or session
 
 ## Sprint 4 — daily risk command centre
 
-- Add saved daily plans: risk budget, max risk per trade, max trades, loss stop, profit lock, and preservation mode.
-- Add stop-loss missing/moved-away, combined exposure, lot escalation, re-entry, revenge-trading, reset proximity, and market-close checks.
-- Produce prioritized actions with evidence, severity, acknowledgement, and resolution state.
+- [x] Add saved daily plans: risk budget, max risk per trade, max trades, loss stop, profit lock, and preservation mode.
+- [x] Add stop-loss missing/moved-away, combined exposure, lot escalation, factual rapid/post-loss re-entry, and reset-proximity checks.
+- [x] Produce prioritized actions with evidence, severity, acknowledgement, resolution, dismissal reasons, and warning history.
+- [ ] Add market-close/weekend checks after the connector supplies authoritative per-symbol session-close data.
 - Add account-health scoring only after its components and weights are explainable.
 
 ## Sprint 5 — news, sessions, and notifications
 
-- Ingest an economic calendar and map events to affected symbols and rule windows.
+- [x] Add the first command-centre slice with a snapshot-aged broker-reset countdown, active in-app alerts, and explicit unavailable deal-history/news/session states.
+- [x] Add an explicitly enabled, unverified Faireconomy ingest with current-sync reconciliation, revision evidence, and strict canonical-FX impact mapping.
+- Add reviewed FundedNext event qualification before deriving firm rule windows or alerts.
 - Add authoritative live restriction timers and session/reset countdowns.
 - Add in-app and email notification delivery with retries, deduplication, quiet hours, and delivery audit.
 - Build session-performance analytics from normalized deal history.

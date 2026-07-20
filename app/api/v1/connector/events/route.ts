@@ -10,6 +10,7 @@ import type { AppDatabase, AppPreparedStatement } from "@/lib/server/database";
 import { isCanonicalMinorUnits, jsonError, readBearerToken } from "@/lib/server/http";
 import { requireDatabase, requireSecret } from "@/lib/server/runtime";
 import { buildRiskCalculationStatements } from "@/lib/server/risk-engine";
+import { buildDailyRiskActionStatements } from "@/lib/server/daily-risk";
 
 type DeviceRow = {
   trading_account_id: string;
@@ -80,6 +81,8 @@ export async function POST(request: Request): Promise<Response> {
         .bind(eventId, claims.accountId, claims.deviceId, envelope.idempotencyKey, envelope.sequence, envelope.eventType, envelope.occurredAt, JSON.stringify(envelope.payload), nowIso, nowIso),
       database.prepare("UPDATE connector_devices SET last_sequence = ?, updated_at = ? WHERE id = ? AND last_sequence < ?")
         .bind(envelope.sequence, nowIso, claims.deviceId, envelope.sequence),
+      database.prepare("UPDATE alerts SET resolved_at = ?, resolved_by_user_id = NULL, resolution_reason = 'Connector telemetry resumed.', updated_at = ? WHERE trading_account_id = ? AND alert_type = 'connector.offline' AND resolved_at IS NULL AND dismissed_at IS NULL")
+        .bind(nowIso, nowIso, claims.accountId),
       database.prepare("INSERT INTO audit_events (id, organization_id, trading_account_id, actor_type, actor_id, event_type, occurred_at, correlation_id, payload_json, previous_hash, event_hash) VALUES (?, ?, ?, 'connector', ?, ?, ?, ?, ?, ?, ?)")
         .bind(`audit_${crypto.randomUUID().replace(/-/g, "")}`, device.organization_id, claims.accountId, claims.deviceId, `connector.${envelope.eventType}`, envelope.occurredAt, correlationId, JSON.stringify({ sequence: envelope.sequence, idempotencyKey: envelope.idempotencyKey }), previousAudit?.event_hash ?? null, eventHash),
     ];
@@ -96,6 +99,7 @@ export async function POST(request: Request): Promise<Response> {
       statements.push(...await positionStatements(database, claims.accountId, envelope.payload.positions, nowIso));
       statements.push(...await pendingOrderStatements(database, claims.accountId, envelope.payload.pendingOrders, nowIso));
       statements.push(...await buildRiskCalculationStatements(database, { tradingAccountId: claims.accountId, snapshotId, snapshot: account, positions: envelope.payload.positions, calculatedAt: nowIso }));
+      statements.push(...await buildDailyRiskActionStatements(database, { tradingAccountId: claims.accountId, snapshotId, observedAt: envelope.occurredAt, snapshot: account, positions: envelope.payload.positions, calculatedAt: nowIso }));
     } else if (envelope.eventType === "heartbeat") {
       statements.push(database.prepare("UPDATE account_connections SET state = 'live', last_heartbeat_at = ?, updated_at = ? WHERE trading_account_id = ?")
         .bind(envelope.occurredAt, nowIso, claims.accountId));

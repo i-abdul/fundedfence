@@ -370,6 +370,64 @@ CREATE TABLE IF NOT EXISTS trade_events (
 
 CREATE INDEX IF NOT EXISTS trade_events_account_time_idx ON trade_events (trading_account_id, occurred_at);
 
+CREATE TABLE IF NOT EXISTS daily_risk_plans (
+  id text PRIMARY KEY,
+  trading_account_id text NOT NULL REFERENCES trading_accounts(id),
+  reset_key text NOT NULL,
+  version integer NOT NULL DEFAULT 1,
+  risk_budget_minor text NOT NULL,
+  max_risk_per_trade_minor text NOT NULL,
+  max_trades integer NOT NULL,
+  loss_stop_minor text NOT NULL,
+  profit_lock_minor text NOT NULL,
+  preservation_mode text NOT NULL DEFAULT 'off',
+  profit_lock_triggered_at text,
+  created_by_user_id text NOT NULL REFERENCES users(id),
+  created_at text NOT NULL,
+  updated_at text NOT NULL,
+  UNIQUE (trading_account_id, reset_key)
+);
+
+CREATE INDEX IF NOT EXISTS daily_risk_plans_account_reset_idx ON daily_risk_plans (trading_account_id, reset_key);
+
+CREATE TABLE IF NOT EXISTS economic_events (
+  id text PRIMARY KEY,
+  provider text NOT NULL,
+  external_id text NOT NULL,
+  title text NOT NULL,
+  currency text NOT NULL,
+  impact text NOT NULL,
+  scheduled_at text NOT NULL,
+  forecast text,
+  previous text,
+  revision_hash text NOT NULL,
+  raw_json text NOT NULL,
+  fetched_at text NOT NULL,
+  created_at text NOT NULL,
+  updated_at text NOT NULL,
+  UNIQUE (provider, external_id)
+);
+
+CREATE INDEX IF NOT EXISTS economic_events_time_currency_idx ON economic_events (scheduled_at, currency);
+
+CREATE TABLE IF NOT EXISTS economic_event_revisions (
+  id text PRIMARY KEY,
+  economic_event_id text NOT NULL REFERENCES economic_events(id),
+  revision_hash text NOT NULL,
+  raw_json text NOT NULL,
+  observed_at text NOT NULL,
+  UNIQUE (economic_event_id, revision_hash)
+);
+
+CREATE TABLE IF NOT EXISTS calendar_sync_states (
+  provider text PRIMARY KEY,
+  status text NOT NULL,
+  fetched_at text,
+  covered_through text,
+  error text,
+  updated_at text NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts (
   id text PRIMARY KEY,
   trading_account_id text NOT NULL REFERENCES trading_accounts(id),
@@ -379,9 +437,22 @@ CREATE TABLE IF NOT EXISTS alerts (
   evidence_json text NOT NULL,
   deduplication_key text NOT NULL UNIQUE,
   acknowledged_at text,
+  acknowledged_by_user_id text REFERENCES users(id),
+  resolved_at text,
+  resolved_by_user_id text REFERENCES users(id),
+  dismissed_at text,
+  dismissed_by_user_id text REFERENCES users(id),
+  resolution_reason text,
   created_at text NOT NULL,
   updated_at text NOT NULL
 );
+
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS acknowledged_by_user_id text REFERENCES users(id);
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS resolved_at text;
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS resolved_by_user_id text REFERENCES users(id);
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS dismissed_at text;
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS dismissed_by_user_id text REFERENCES users(id);
+ALTER TABLE alerts ADD COLUMN IF NOT EXISTS resolution_reason text;
 
 CREATE INDEX IF NOT EXISTS alerts_account_created_idx ON alerts (trading_account_id, created_at);
 

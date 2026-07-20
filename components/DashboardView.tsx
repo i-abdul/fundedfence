@@ -58,7 +58,62 @@ type DashboardLiveState = {
     output: { guardian?: GuardianOutput; consistency?: ConsistencyOutput };
     explanations: string[];
   } | null;
+  dailyPlan?: DailyRiskPlan | null;
+  dailyPlanStatus?: {
+    riskBudgetRemainingMinor: string | null;
+    knownRiskMinor: string;
+    riskCoverageComplete: boolean;
+  } | null;
+  riskActions?: RiskAction[];
+  riskActionHistory?: RiskAction[];
+  riskActionAvailability?: {
+    marketClose: "unknown";
+    marketCloseReason: string;
+    healthScore: "not-calculated";
+    healthScoreReason: string;
+    dealHistory: "calculated" | "unknown";
+    dealHistoryReason: string;
+  };
+  commandCentre?: CommandCentre;
   dataFreshness?: "live" | "delayed" | "offline";
+};
+
+type CommandCentre = {
+  generatedAt: string;
+  news: { availability: "unknown" | "calculated"; reason: string; coveredThrough: string | null; treatment: { mode: "allowed" | "allowed-reward-adjustment"; label: string; windowMinutesBefore: number; windowMinutesAfter: number; qualifyingProfitBps: number; affectedInstrumentsOnly: boolean } | null; nextEvent: null | { id: string; title: string; currency: string; impact: string; scheduledAt: string; remainingSeconds: number; affectedSymbols: string[]; qualification: "unverified"; windowStartsAt: string | null; windowEndsAt: string | null; source: { provider: string; authorityClass: string; revisionHash: string } } };
+  sessions: { availability: "unknown" | "calculated"; reason: string; nextTransition: null };
+  tradingDay: { availability: "unknown" | "calculated"; reason: string; resetKey: string | null; resetRemainingSeconds: number | null; equityChangeMinor: string | null; entryCount: number | null; historyComplete: boolean };
+  notifications: { activeCount: number; latest: Array<{ id: string; type: string; severity: string; title: string; detectedAt: string }>; email: "not-configured" };
+  sessionAnalytics: { availability: "unknown" | "calculated"; reason: string; rows: Array<{ label: string; executionCount: number; netResultMinor: string }> };
+};
+
+type DailyRiskPlan = {
+  id: string;
+  resetKey: string;
+  version: number;
+  riskBudgetMinor: string;
+  maxRiskPerTradeMinor: string;
+  maxTrades: number;
+  lossStopMinor: string;
+  profitLockMinor: string;
+  preservationMode: "off" | "manual" | "profit-lock";
+  profitLockTriggeredAt: string | null;
+  updatedAt: string;
+};
+
+type RiskAction = {
+  id: string;
+  type: string;
+  severity: "critical" | "high" | "medium" | "info";
+  priority: number;
+  title: string;
+  evidence: Record<string, unknown>;
+  state: "open" | "acknowledged" | "resolved" | "dismissed";
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+  dismissedAt: string | null;
+  resolutionReason: string | null;
+  lastDetectedAt: string;
 };
 
 type GuardianStatus = "healthy" | "caution" | "critical" | "breached";
@@ -117,7 +172,7 @@ type AccountListItem = {
 };
 
 export function DashboardView({ userLabel }: { userLabel?: string }) {
-  const { liveState, loading, accounts, selectedAccountId, selectAccount } = useLiveAccount();
+  const { liveState, loading, accounts, selectedAccountId, selectAccount, refresh } = useLiveAccount();
   const liveAccount = liveState?.account;
   const liveSnapshot = liveState?.snapshot;
   const liveMode = Boolean(liveAccount);
@@ -129,6 +184,8 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
   const guardian = riskCalculation?.output.guardian;
   const consistency = riskCalculation?.output.consistency;
   const riskActive = Boolean(guardian);
+  const riskActions = liveState?.riskActions ?? [];
+  const commandCentre = liveState?.commandCentre;
 
   return (
     <main className="dashboard-shell">
@@ -153,7 +210,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
           <h1>Account overview</h1>
         </div>
         <div className="topbar-actions">
-          <button className="icon-button" aria-label="View notifications">3</button>
+          <a className="icon-button" aria-label="View active notifications" href="#notifications">{commandCentre?.notifications.activeCount ?? riskActions.length}</a>
           <Link className="button button-primary button-small" href="/onboarding">Connect account</Link>
         </div>
       </div>
@@ -163,6 +220,8 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
         <span className="phase-pill">{liveMode ? liveAccount?.status ?? "connected" : demoAccount.phase}</span>
         <div className={`live-state ${freshness}`}><span /> {liveMode ? freshnessLabel(freshness) : "Live preview"} <small>{liveMode ? heartbeatLabel(liveAccount?.last_heartbeat_at) : demoAccount.lastHeartbeat}</small></div>
       </section>
+
+      <CommandCentrePanel key={commandCentre?.generatedAt ?? "preview"} command={commandCentre} currency={currency} />
 
       <section className="health-grid">
         {liveMode ? guardian ? <LiveHealth guardian={guardian} openPositionCount={livePositions.length} riskSummary={riskSummary} currency={currency} /> : <PendingHealth snapshotReady={Boolean(liveSnapshot)} openPositionCount={livePositions.length} riskSummary={riskSummary} currency={currency} /> : <DemoHealth />}
@@ -223,18 +282,14 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
           <div className="panel-footer">{liveMode ? <><span>Known risk at stops: <strong>{formatMoney(riskSummary?.known_risk_minor, currency)}</strong></span><span>{guardian?.scenarios.allStopsReached.availability === "calculated" ? <>All-stops buffer: <strong>{formatClosestScenarioBuffer(guardian.scenarios.allStopsReached, currency)}</strong></> : <>Stop coverage: <strong>{riskCoverageLabel(livePositions.length, riskSummary)}</strong></>}</span></> : <><span>Projected equity at all stops: <strong>$100,202</strong></span><span>Remaining buffer: <strong>$1,962</strong></span></>}</div>
         </article>
 
-        <article className="panel daily-plan" id="simulator">
-          <div className="panel-heading"><div><p className="eyebrow">Discipline</p><h2>Today’s plan</h2></div><span className="status-pill neutral">{liveMode ? "Not configured" : "London + NY"}</span></div>
-          {liveMode ? <>
-            <div className="plan-budget"><small>Risk budget remaining</small><strong>—</strong><span>requires your daily plan</span><div className="progress-track"><span style={{ width: "0%" }} /></div></div>
-            <dl className="plan-list"><div><dt>Max risk / trade</dt><dd>—</dd></div><div><dt>Trades remaining</dt><dd>—</dd></div><div><dt>Stop after loss</dt><dd>—</dd></div><div><dt>Profit lock</dt><dd>—</dd></div></dl>
-            <div className="plan-warning"><span>!</span><p><strong>Daily plan is not active</strong><small>This Sprint will add saved risk budgets after the live account path is stable.</small></p></div>
-          </> : <>
+        {liveMode ? <DailyPlanPanel accountId={liveAccount?.id ?? ""} currency={currency} plan={liveState?.dailyPlan ?? null} status={liveState?.dailyPlanStatus ?? null} onChanged={refresh} /> : <article className="panel daily-plan" id="simulator">
+          <div className="panel-heading"><div><p className="eyebrow">Discipline</p><h2>Today’s plan</h2></div><span className="status-pill neutral">London + NY</span></div>
+          <>
             <div className="plan-budget"><small>Risk budget remaining</small><strong>$1,332</strong><span>of $2,000</span><div className="progress-track"><span style={{ width: "66%" }} /></div></div>
             <dl className="plan-list"><div><dt>Max risk / trade</dt><dd>$500</dd></div><div><dt>Trades remaining</dt><dd>2 of 4</dd></div><div><dt>Stop after loss</dt><dd>−$1,500</dd></div><div><dt>Profit lock</dt><dd>+$1,200</dd></div></dl>
             <div className="plan-warning"><span>!</span><p><strong>High-impact news watch</strong><small>Illustrative warning · verify against the active ruleset.</small></p></div>
-          </>}
-        </article>
+          </>
+        </article>}
       </section>
 
       <section className="panel rules-panel">
@@ -250,7 +305,7 @@ export function DashboardView({ userLabel }: { userLabel?: string }) {
 
       <section className="dashboard-columns lower" id="timeline">
         <article className="panel timeline-panel"><div className="panel-heading"><div><p className="eyebrow">Audit trail</p><h2>Account timeline</h2></div><span className="panel-count">Today</span></div><div className="timeline-list">{liveMode ? <><Timeline time={formatTimelineTime(liveAccount?.last_heartbeat_at)} title={`Connector ${freshnessLabel(freshness).toLowerCase()}`} detail={liveAccount?.last_heartbeat_at ? `Last heartbeat ${heartbeatLabel(liveAccount.last_heartbeat_at)}` : "No heartbeat has been received"} tone={freshness === "live" ? "healthy" : "caution"} /><Timeline time={formatTimelineTime(liveSnapshot?.observed_at)} title={liveSnapshot ? "Account snapshot received" : "Waiting for first snapshot"} detail={liveSnapshot ? `Balance and equity observed at ${formatTimestamp(liveSnapshot.observed_at)}` : "Keep MT5 and the EA running"} tone={liveSnapshot ? "healthy" : "caution"} /></> : <><Timeline time="14:32" title="Risk state recalculated" detail="Snapshot sequence 8,214 · all rule buffers healthy" tone="healthy" /><Timeline time="14:29" title="Stop-loss changed" detail="EURUSD stop moved to 1.08180 · risk reduced by $240" tone="neutral" /><Timeline time="14:17" title="News caution window" detail="Illustrative event restriction begins in 13 minutes" tone="caution" /><Timeline time="13:58" title="Connector heartbeat" detail="Round-trip 184 ms · sequence continuous" tone="healthy" /></>}</div></article>
-        <article className="panel protection-panel"><span className="protection-mark">✓</span><p className="eyebrow">Read-only by design</p><h2>Your terminal stays in control.</h2><p>The connector observes account data and sends signed events. It contains no order placement, modification, or closing calls.</p><Link className="quiet-link" href="/pairing">Review connector setup →</Link></article>
+        {liveMode ? <RiskActionsPanel accountId={liveAccount?.id ?? ""} actions={riskActions} history={liveState?.riskActionHistory ?? []} availability={liveState?.riskActionAvailability} onChanged={refresh} /> : <article className="panel protection-panel"><span className="protection-mark">✓</span><p className="eyebrow">Priority actions</p><h2>Connect an account to activate the command centre.</h2><p>The read-only connector observes account data and sends signed events. It contains no order placement, modification, or closing calls.</p><Link className="quiet-link" href="/pairing">Review connector setup →</Link></article>}
       </section>
       <footer className="product-footer"><span>FundedFence provides risk-monitoring tools, not financial advice or a guarantee of challenge success.</span><span>{liveMode ? riskActive ? `Live telemetry and rule engine ${riskCalculation?.engineVersion} are active.` : "Live telemetry is active; firm rule outputs remain disabled." : "Data shown here is illustrative."}</span></footer>
     </main>
@@ -275,6 +330,23 @@ function DemoHealth() {
       </div>
     </article>
   );
+}
+
+function CommandCentrePanel({ command, currency }: { command: CommandCentre | undefined; currency: string }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const interval = window.setInterval(() => setElapsed((value) => value + 1), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const resetSeconds = command?.tradingDay.resetRemainingSeconds == null || elapsed > 15 ? null : Math.max(0, command.tradingDay.resetRemainingSeconds - elapsed);
+  const newsExpired = elapsed > 30 * 60;
+  const eventSeconds = command?.news.nextEvent && !newsExpired ? Math.max(0, command.news.nextEvent.remainingSeconds - elapsed) : null;
+  return <section className="command-grid" aria-label="Daily command centre">
+    <article className="panel command-card"><div className="panel-heading"><div><p className="eyebrow">Market context</p><h2>News &amp; sessions</h2></div><span className={`status-pill ${command?.news.availability === "calculated" && !newsExpired ? "caution" : "neutral"}`}>{newsExpired ? "stale" : command?.news.availability ?? "unknown"}</span></div><strong>{newsExpired ? "Calendar refresh overdue" : command?.news.nextEvent ? command.news.nextEvent.title : command?.news.treatment?.label ?? "No live calendar"}</strong>{command?.news.nextEvent && <p className="command-event-time">{eventSeconds === null ? "—" : formatDuration(eventSeconds)} · {command.news.nextEvent.currency} · {command.news.nextEvent.impact} impact</p>}<p>{newsExpired ? "The last successful dashboard refresh is too old for calendar timing." : command?.news.reason ?? "Connect an account to evaluate sourced market context."}</p>{command?.news.nextEvent && <small>Affects {command.news.nextEvent.affectedSymbols.join(", ")} · qualification unverified · {command.news.nextEvent.source.provider}</small>}{command?.news.treatment && <small>{command.news.treatment.mode === "allowed" ? "No reward-adjustment window in the effective profile." : `${formatBps(command.news.treatment.qualifyingProfitBps)} of profit from qualifying profitable trades is counted · ${command.news.treatment.windowMinutesBefore} min before / ${command.news.treatment.windowMinutesAfter} min after · ${command.news.treatment.affectedInstrumentsOnly ? "affected instruments only" : "all instruments"}`}</small>}<small>Sessions: {command?.sessions.reason ?? "No authoritative broker sessions."}</small></article>
+    <article className="panel command-card"><div className="panel-heading"><div><p className="eyebrow">Broker clock</p><h2>Trading day</h2></div><span className={`status-pill ${resetSeconds === null ? "neutral" : "healthy"}`}>{resetSeconds === null ? "Unknown" : "Fresh"}</span></div><strong className="command-timer">{resetSeconds === null ? "—" : formatDuration(resetSeconds)}</strong><p>{resetSeconds === null ? command?.tradingDay.reason ?? "Waiting for live broker time." : `until broker reset · ${command?.tradingDay.resetKey}`}</p><small>Equity change {formatMoney(command?.tradingDay.equityChangeMinor, currency)} · entries {command?.tradingDay.entryCount ?? "unknown"}</small></article>
+    <article className="panel command-card" id="notifications"><div className="panel-heading"><div><p className="eyebrow">In-app channel</p><h2>Notifications</h2></div><span className={`status-pill ${command?.notifications.activeCount ? "caution" : "neutral"}`}>{command?.notifications.activeCount ?? 0} active</span></div>{command?.notifications.latest.length ? <div className="command-list">{command.notifications.latest.map((item) => <p key={item.id}><strong>{item.title}</strong><small>{item.severity} · {formatTimestamp(item.detectedAt)}</small></p>)}</div> : <p>No active notifications. Unknown checks are not treated as clear.</p>}<small>Email not configured</small></article>
+    <article className="panel command-card"><div className="panel-heading"><div><p className="eyebrow">Observed executions</p><h2>Session performance</h2></div><span className="status-pill neutral">Unknown</span></div><strong>Not calculated</strong><p>{command?.sessionAnalytics.reason ?? "No authoritative session definitions are stored."}</p><small>Named sessions will use exact net deal economics.</small></article>
+  </section>;
 }
 
 function LiveHealth({ guardian, openPositionCount, riskSummary, currency }: { guardian: GuardianOutput; openPositionCount: number; riskSummary: DashboardLiveState["riskSummary"]; currency: string }) {
@@ -331,11 +403,12 @@ function LiveRuleCards({ guardian, consistency, currency }: { guardian: Guardian
   return <>{cards.map((card) => <div className="rule-card" key={card.name}><span className={`rule-state ${card.tone}`} /><div><small>{card.name}</small><strong>{card.value}</strong></div><p>{card.current}<br /><span>{card.limit}</span></p><em className={card.tone}>{card.status}</em></div>)}</>;
 }
 
-function useLiveAccount(): { liveState: DashboardLiveState | null; loading: boolean; accounts: AccountListItem[]; selectedAccountId: string | null; selectAccount: (accountId: string) => void } {
+function useLiveAccount(): { liveState: DashboardLiveState | null; loading: boolean; accounts: AccountListItem[]; selectedAccountId: string | null; selectAccount: (accountId: string) => void; refresh: () => void } {
   const [accounts, setAccounts] = useState<AccountListItem[]>([]);
   const [accountId, setAccountId] = useState<string | null>(null);
   const [liveState, setLiveState] = useState<DashboardLiveState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -392,7 +465,7 @@ function useLiveAccount(): { liveState: DashboardLiveState | null; loading: bool
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [accountId]);
+  }, [accountId, refreshToken]);
 
   function selectAccount(selectedId: string) {
     if (!accounts.some((account) => account.id === selectedId)) return;
@@ -401,7 +474,73 @@ function useLiveAccount(): { liveState: DashboardLiveState | null; loading: bool
     window.localStorage.setItem("fundedfence.selectedAccountId", selectedId);
   }
 
-  return { liveState, loading, accounts, selectedAccountId: accountId, selectAccount };
+  return { liveState, loading, accounts, selectedAccountId: accountId, selectAccount, refresh: () => setRefreshToken((value) => value + 1) };
+}
+
+function DailyPlanPanel({ accountId, currency, plan, status, onChanged }: { accountId: string; currency: string; plan: DailyRiskPlan | null; status: DashboardLiveState["dailyPlanStatus"]; onChanged: () => void }) {
+  const [editing, setEditing] = useState(!plan);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function save(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    const form = new FormData(event.currentTarget);
+    try {
+      const response = await fetch(`/api/v1/accounts/${accountId}/daily-plan`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ riskBudgetMinor: majorToMinor(form.get("riskBudget")), maxRiskPerTradeMinor: majorToMinor(form.get("maxRiskPerTrade")), maxTrades: Number(form.get("maxTrades")), lossStopMinor: majorToMinor(form.get("lossStop")), profitLockMinor: majorToMinor(form.get("profitLock")), preservationMode: form.get("preservationMode") }) });
+      const payload = await response.json() as { error?: { message?: string } };
+      if (!response.ok) throw new Error(payload.error?.message ?? "The daily plan could not be saved.");
+      setEditing(false);
+      setMessage("Daily plan saved.");
+      onChanged();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The daily plan could not be saved.");
+    } finally { setBusy(false); }
+  }
+  return <article className="panel daily-plan" id="simulator">
+    <div className="panel-heading"><div><p className="eyebrow">Discipline</p><h2>Today’s plan</h2></div><button className="button button-secondary button-small" type="button" onClick={() => setEditing((value) => !value)}>{editing ? "Cancel" : "Edit"}</button></div>
+    {editing ? <form className="plan-form" onSubmit={save}>
+      <label><span>Daily risk budget ({currency})</span><input name="riskBudget" inputMode="decimal" defaultValue={minorToMajor(plan?.riskBudgetMinor)} required /></label>
+      <label><span>Max risk / trade ({currency})</span><input name="maxRiskPerTrade" inputMode="decimal" defaultValue={minorToMajor(plan?.maxRiskPerTradeMinor)} required /></label>
+      <label><span>Max trades</span><input name="maxTrades" type="number" min="1" max="100" defaultValue={plan?.maxTrades ?? 4} required /></label>
+      <label><span>Manual loss stop ({currency})</span><input name="lossStop" inputMode="decimal" defaultValue={minorToMajor(plan?.lossStopMinor)} required /></label>
+      <label><span>Profit lock ({currency})</span><input name="profitLock" inputMode="decimal" defaultValue={minorToMajor(plan?.profitLockMinor)} required /></label>
+      <label><span>Preservation</span><select name="preservationMode" defaultValue={plan?.preservationMode ?? "off"}><option value="off">Off</option><option value="manual">Manual</option><option value="profit-lock">At profit lock</option></select></label>
+      <button className="button button-primary button-small" disabled={busy}>{busy ? "Saving…" : "Save plan"}</button>
+    </form> : <>
+      <div className="plan-budget"><small>Risk budget remaining</small><strong>{status?.riskBudgetRemainingMinor === null ? "Not calculated" : formatMoney(status?.riskBudgetRemainingMinor, currency)}</strong><span>of {formatMoney(plan?.riskBudgetMinor, currency)}</span><div className="progress-track"><span style={{ width: status?.riskBudgetRemainingMinor && plan ? `${Number(BigInt(status.riskBudgetRemainingMinor) * 100n / BigInt(plan.riskBudgetMinor))}%` : "0%" }} /></div></div>
+      <dl className="plan-list"><div><dt>Max risk / trade</dt><dd>{formatMoney(plan?.maxRiskPerTradeMinor, currency)}</dd></div><div><dt>Max trades</dt><dd>{plan?.maxTrades ?? "—"}</dd></div><div><dt>Stop after loss</dt><dd>{formatMoney(plan?.lossStopMinor, currency)}</dd></div><div><dt>Profit lock</dt><dd>{formatMoney(plan?.profitLockMinor, currency)}</dd></div></dl>
+      <div className="plan-warning"><span>{status?.riskCoverageComplete ? "✓" : "!"}</span><p><strong>{plan ? `${plan.preservationMode === "off" ? "Standard" : "Preservation"} plan · version ${plan.version}` : "Daily plan is not active"}</strong><small>{status?.riskCoverageComplete ? `Known stop risk ${formatMoney(status.knownRiskMinor, currency)}.` : "Remaining budget stays unknown until every position has a stop and contract metadata."}</small></p></div>
+    </>}
+    {message && <p className="plan-message" role="status">{message}</p>}
+  </article>;
+}
+
+function RiskActionsPanel({ accountId, actions, history, availability, onChanged }: { accountId: string; actions: RiskAction[]; history: RiskAction[]; availability: DashboardLiveState["riskActionAvailability"]; onChanged: () => void }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  async function transition(action: RiskAction, value: "acknowledge" | "resolve" | "dismiss") {
+    const promptedReason = value === "acknowledge" ? "" : window.prompt(value === "dismiss" ? "Why are you dismissing this action?" : "Resolution note (optional)");
+    if (promptedReason === null) return;
+    const reason = promptedReason;
+    if (value === "dismiss" && !reason.trim()) return;
+    setBusy(action.id);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/v1/accounts/${accountId}/risk-actions`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ actionId: action.id, transition: value, reason }) });
+      const payload = await response.json() as { error?: { message?: string } };
+      if (!response.ok) throw new Error(payload.error?.message ?? "The risk action could not be updated.");
+      onChanged();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "The risk action could not be updated."); }
+    finally { setBusy(null); }
+  }
+  return <article className="panel actions-panel" id="actions">
+    <div className="panel-heading"><div><p className="eyebrow">What to do now</p><h2>Priority actions</h2></div><span className={`status-pill ${actions.length ? "caution" : "neutral"}`}>{actions.length ? `${actions.length} open` : "Checks pending"}</span></div>
+    <div className="action-list">{actions.length ? actions.map((action) => <div className="action-row" key={action.id}><span className={`action-severity ${action.severity}`} /><div><strong>{action.title}</strong><small>{action.type.replaceAll(".", " ")} · {action.state}</small><div className="action-buttons">{action.state === "open" && <button disabled={busy === action.id} onClick={() => transition(action, "acknowledge")}>Acknowledge</button>}<button disabled={busy === action.id} onClick={() => transition(action, "resolve")}>Resolve</button><button disabled={busy === action.id} onClick={() => transition(action, "dismiss")}>Dismiss</button></div></div></div>) : <p className="action-empty">No current plan or telemetry actions. Unknown checks are not treated as safe.</p>}</div>
+    {history.length > 0 && <details className="action-history"><summary>Warning history ({history.length})</summary>{[...history].sort((a, b) => b.lastDetectedAt.localeCompare(a.lastDetectedAt)).slice(0, 5).map((action) => <p key={action.id}><strong>{action.title}</strong><span>{action.state} · {formatTimestamp(action.lastDetectedAt)}</span></p>)}</details>}
+    <p className="action-unknown">Trade history: {availability?.dealHistoryReason ?? "Not calculated."}<br />Market close: {availability?.marketCloseReason ?? "Not calculated."}<br />Health score: {availability?.healthScoreReason ?? "Not calculated."}</p>
+    {message && <p className="plan-message" role="alert">{message}</p>}
+  </article>;
 }
 
 function formatMoney(value: string | null | undefined, currency: string): string {
@@ -415,9 +554,29 @@ function formatMoney(value: string | null | undefined, currency: string): string
   return `${currency === "USD" ? "$" : `${currency} `}${number}`;
 }
 
+function majorToMinor(value: FormDataEntryValue | null): string {
+  const text = String(value ?? "").trim();
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text);
+  if (!match) throw new Error("Money values must use no more than two decimal places.");
+  return (BigInt(match[1]) * 100n + BigInt((match[2] ?? "").padEnd(2, "0") || "0")).toString();
+}
+
+function minorToMajor(value: string | undefined): string {
+  if (!value || !/^\d+$/.test(value)) return "";
+  const minor = BigInt(value);
+  return `${minor / 100n}.${(minor % 100n).toString().padStart(2, "0")}`;
+}
+
 function formatBps(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   return `${(value / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`;
+}
+
+function formatDuration(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remaining = seconds % 60;
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${remaining.toString().padStart(2, "0")}`;
 }
 
 function guardianTone(status: GuardianStatus): "healthy" | "caution" {

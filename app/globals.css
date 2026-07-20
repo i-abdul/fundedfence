@@ -176,6 +176,18 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .icon-button { border-radius: 9px; font-size: 9px; height: 38px; width: 38px; }
 .kebab { border: 0; font-size: 16px; }
 .account-strip { align-items: center; background: #0b1712; border: 1px solid var(--line); border-radius: 12px; display: flex; margin-bottom: 12px; min-height: 63px; padding: 10px 14px; }
+.command-grid { display: grid; gap: 12px; grid-template-columns: repeat(4, 1fr); margin-bottom: 12px; }
+.command-card { min-height: 166px; padding: 16px; }
+.command-card > strong { display: block; font-size: 15px; font-weight: 540; margin-top: 19px; }
+.command-card > p { color: #718178; font-size: 9px; line-height: 1.5; margin: 7px 0; }
+.command-card > small { color: #596a61; display: block; font-size: 8px; line-height: 1.45; }
+.command-card .command-timer { color: var(--mint); font-size: 22px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.command-card .command-event-time { color: var(--amber); font-variant-numeric: tabular-nums; }
+.command-list { display: grid; gap: 7px; margin: 13px 0 8px; }
+.command-list p { border-bottom: 1px solid var(--line); margin: 0; padding-bottom: 6px; }
+.command-list strong, .command-list small { display: block; }
+.command-list strong { font-size: 9px; font-weight: 530; }
+.command-list small { color: #64756c; font-size: 8px; margin-top: 3px; text-transform: capitalize; }
 .account-identity { align-items: center; display: flex; gap: 10px; min-width: 275px; }
 .mini-shield { align-items: center; background: #13291f; border: 1px solid rgba(154,230,189,.14); border-radius: 9px; color: var(--mint); display: flex; font-size: 7px; height: 34px; justify-content: center; width: 31px; }
 .account-identity strong, .account-identity small { display: block; }
@@ -237,7 +249,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .metric-card > strong { display: block; font-size: 21px; font-weight: 520; letter-spacing: -.04em; margin-top: 17px; }
 .metric-card p { color: #697870; font-size: 8px; margin: 5px 0 0; }
 .dashboard-columns { display: grid; gap: 12px; grid-template-columns: 1.5fr .5fr; margin-bottom: 12px; }
-.positions-panel, .daily-plan, .rules-panel, .timeline-panel, .protection-panel { padding: 20px; }
+.positions-panel, .daily-plan, .rules-panel, .timeline-panel, .protection-panel, .actions-panel { padding: 20px; }
 .panel-count { background: rgba(255,255,255,.035); color: #77877f; }
 .positions-table { margin-top: 17px; }
 .position-row { align-items: center; border-top: 1px solid rgba(255,255,255,.05); display: grid; font-size: 9px; grid-template-columns: 1.15fr .75fr 1fr 1fr .65fr .8fr; min-height: 51px; }
@@ -265,6 +277,32 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
 .plan-warning strong, .plan-warning small { display: block; }
 .plan-warning strong { color: #cfbd8f; font-size: 8px; }
 .plan-warning small { color: #7e7663; font-size: 7px; margin-top: 3px; }
+.plan-form { display: grid; gap: 9px; grid-template-columns: 1fr 1fr; margin-top: 17px; }
+.plan-form label { display: grid; gap: 5px; }
+.plan-form label > span { color: #77877f; font-size: 9px; }
+.plan-form input, .plan-form select { background: rgba(255,255,255,.025); border: 1px solid var(--line); border-radius: 8px; color: var(--ink); min-height: 38px; padding: 0 9px; width: 100%; }
+.plan-form button { grid-column: 1 / -1; }
+.plan-message { color: var(--amber); font-size: 10px; margin: 10px 0 0; }
+.action-list { display: grid; gap: 8px; margin-top: 17px; }
+.action-row { align-items: flex-start; background: rgba(255,255,255,.02); border: 1px solid var(--line); border-radius: 9px; display: grid; gap: 9px; grid-template-columns: 4px 1fr; padding: 10px; }
+.action-severity { border-radius: 999px; height: 100%; min-height: 42px; }
+.action-severity.critical { background: var(--danger); }
+.action-severity.high { background: var(--amber); }
+.action-severity.medium { background: #829188; }
+.action-severity.info { background: var(--mint-strong); }
+.action-row strong, .action-row small { display: block; }
+.action-row strong { font-size: 10px; font-weight: 560; }
+.action-row small { color: #66766e; font-size: 8px; margin-top: 3px; text-transform: capitalize; }
+.action-buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.action-buttons button { background: transparent; border: 1px solid var(--line-strong); border-radius: 6px; color: #91a198; cursor: pointer; font-size: 8px; padding: 5px 7px; }
+.action-buttons button:disabled { cursor: wait; opacity: .5; }
+.action-empty, .action-unknown { color: #718178; font-size: 9px; line-height: 1.5; }
+.action-unknown { border-top: 1px solid var(--line); margin: 13px 0 0; padding-top: 11px; }
+.action-history { border-top: 1px solid var(--line); color: #718178; font-size: 9px; margin-top: 12px; padding-top: 10px; }
+.action-history summary { cursor: pointer; }
+.action-history p { display: flex; justify-content: space-between; margin: 9px 0 0; }
+.action-history strong { color: #aebbb4; font-weight: 520; }
+.action-history span { text-transform: capitalize; }
 .rules-panel { margin-bottom: 12px; }
 .rule-grid { display: grid; gap: 9px; grid-template-columns: repeat(4,1fr); margin-top: 17px; }
 .rule-card { align-items: center; background: rgba(255,255,255,.018); border: 1px solid rgba(255,255,255,.05); border-radius: 10px; display: grid; gap: 8px; grid-template-columns: 6px 1fr auto auto; padding: 12px; }
@@ -549,7 +587,7 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .protection-section, .security-card, .cta-section { gap: 55px; padding-left: 28px; padding-right: 28px; }
   .marketing-footer { margin: 0 28px; }
   .health-grid, .dashboard-columns { grid-template-columns: 1fr; }
-  .metric-grid { grid-template-columns: 1fr 1fr; }
+  .metric-grid, .command-grid { grid-template-columns: 1fr 1fr; }
   .rule-grid { grid-template-columns: 1fr 1fr; }
   .pairing-layout { gap: 45px; grid-template-columns: minmax(450px, 1fr) 350px; }
 }
@@ -618,10 +656,12 @@ button:focus-visible, a:focus-visible, select:focus-visible, input:focus-visible
   .balance-values { gap: 13px; }
   .balance-values span:last-child { padding-left: 13px; }
   .metric-grid, .rule-grid { grid-template-columns: 1fr 1fr; }
+  .command-grid { grid-template-columns: 1fr; }
   .position-header { display: none; }
   .position-row { gap: 9px; grid-template-columns: 1fr 1fr 1fr; padding: 12px 0; }
   .position-row > span:nth-child(4), .position-row > span:nth-child(6) { display: none; }
   .panel-footer { flex-direction: column; gap: 5px; }
+  .plan-form { grid-template-columns: 1fr; }
   .rule-card { grid-template-columns: 5px 1fr auto; }
   .rule-card > p { display: none; }
   .product-footer { flex-direction: column; gap: 6px; line-height: 1.4; }

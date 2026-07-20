@@ -59,7 +59,7 @@ export function RuleProfilesView({ profiles, canAdmin }: { profiles: RuleProfile
                   <div><dt>Loss model</dt><dd>{humanize(rule.maximumLoss.model)}</dd></div>
                   <div><dt>Daily reset</dt><dd>{rule.dailyLoss ? "00:00 broker time" : "Not applicable"}</dd></div>
                   <div><dt>Overnight / weekend</dt><dd>{rule.holding.overnight} / {rule.holding.weekend}</dd></div>
-                  <div><dt>News trading</dt><dd>{rule.news.mode === "allowed" ? "Allowed" : `${percent(rule.news.qualifyingProfitBps)} qualifying profit in ±${rule.news.windowMinutesBefore} min`}</dd></div>
+                  <div><dt>News trading</dt><dd>{newsLabel(rule.news)}</dd></div>
                   {rule.maximumOpenPositions != null && <div><dt>Maximum open positions</dt><dd>{rule.maximumOpenPositions}</dd></div>}
                   {rule.expertAdvisors && <div><dt>Expert advisors</dt><dd>{humanize(rule.expertAdvisors.mode)}</dd></div>}
                 </dl>
@@ -125,4 +125,9 @@ function percent(bps: number | null): string {
 
 function humanize(value: string): string {
   return value.replaceAll("-", " ").replace(/^./, (character) => character.toUpperCase());
+}
+
+function newsLabel(news: RuleProfileView["versions"][number]["definition"]["news"]): string {
+  if (news.mode === "allowed") return "Allowed";
+  return `Allowed · ${percent(news.qualifyingProfitBps)} of profit from qualifying profitable trades is counted · ${news.windowMinutesBefore} min before / ${news.windowMinutesAfter} min after${news.affectedInstrumentsOnly ? " · affected instruments only" : ""}`;
 }

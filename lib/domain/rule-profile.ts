@@ -82,6 +82,7 @@ export function validateRuleDefinition(value: unknown): RuleDefinition {
   if (rule.dailyLoss !== null) validateLoss(rule.dailyLoss, true);
   validateLoss(rule.maximumLoss, false);
   if (!rule.holding || !rule.news || !rule.consistency || !rule.copyTrading || !rule.payoutEligibility) throw new Error("Rule restriction metadata is incomplete.");
+  if (!["allowed", "allowed-reward-adjustment"].includes(rule.news.mode) || !Number.isInteger(rule.news.windowMinutesBefore) || rule.news.windowMinutesBefore < 0 || !Number.isInteger(rule.news.windowMinutesAfter) || rule.news.windowMinutesAfter < 0 || !Number.isInteger(rule.news.qualifyingProfitBps) || rule.news.qualifyingProfitBps < 0 || rule.news.qualifyingProfitBps > 10_000 || typeof rule.news.affectedInstrumentsOnly !== "boolean") throw new Error("Rule news metadata is invalid.");
   if (rule.expertAdvisors && !["allowed", "prohibited", "unknown"].includes(rule.expertAdvisors.mode)) throw new Error("Expert-advisor rule metadata is invalid.");
   if (rule.maximumOpenPositions !== undefined && rule.maximumOpenPositions !== null && (!Number.isInteger(rule.maximumOpenPositions) || rule.maximumOpenPositions < 1)) throw new Error("Maximum open positions are invalid.");
   if (!Array.isArray(rule.interpretationNotes) || !Array.isArray(rule.unknownInputs)) throw new Error("Rule interpretation metadata is invalid.");

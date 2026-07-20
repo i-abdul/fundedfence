@@ -15,6 +15,8 @@
 
 Local `.env` values are ignored. `.env.example` documents names only.
 
+The Sprint 5 Faireconomy calendar monitor is PostgreSQL/OCI-only and disabled by default. Set `ECONOMIC_CALENDAR_ENABLED=true` only after accepting the provider’s terms; D1 deployments keep calendar status explicitly unknown until a scheduled writer exists.
+
 ## Build and migration
 
 Run unit tests, lint, typecheck, database generation, production build, rendered integration tests, and critical journeys. Inspect every generated SQL migration. Package the exact validated `dist` output, hosting metadata, and migrations. A deployment must reference the exact pushed source commit.

@@ -286,6 +286,55 @@ export const tradeEvents = sqliteTable("trade_events", {
   ...timestamps,
 }, (table) => [uniqueIndex("trade_events_device_idempotency_unique").on(table.connectorDeviceId, table.idempotencyKey), index("trade_events_account_time_idx").on(table.tradingAccountId, table.occurredAt)]);
 
+export const dailyRiskPlans = sqliteTable("daily_risk_plans", {
+  id: text("id").primaryKey(),
+  tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
+  resetKey: text("reset_key").notNull(),
+  version: integer("version").notNull().default(1),
+  riskBudgetMinor: text("risk_budget_minor").notNull(),
+  maxRiskPerTradeMinor: text("max_risk_per_trade_minor").notNull(),
+  maxTrades: integer("max_trades").notNull(),
+  lossStopMinor: text("loss_stop_minor").notNull(),
+  profitLockMinor: text("profit_lock_minor").notNull(),
+  preservationMode: text("preservation_mode").notNull().default("off"),
+  profitLockTriggeredAt: text("profit_lock_triggered_at"),
+  createdByUserId: text("created_by_user_id").notNull().references(() => users.id),
+  ...timestamps,
+}, (table) => [uniqueIndex("daily_risk_plans_account_reset_unique").on(table.tradingAccountId, table.resetKey), index("daily_risk_plans_account_reset_idx").on(table.tradingAccountId, table.resetKey)]);
+
+export const economicEvents = sqliteTable("economic_events", {
+  id: text("id").primaryKey(),
+  provider: text("provider").notNull(),
+  externalId: text("external_id").notNull(),
+  title: text("title").notNull(),
+  currency: text("currency").notNull(),
+  impact: text("impact").notNull(),
+  scheduledAt: text("scheduled_at").notNull(),
+  forecast: text("forecast"),
+  previous: text("previous"),
+  revisionHash: text("revision_hash").notNull(),
+  rawJson: text("raw_json").notNull(),
+  fetchedAt: text("fetched_at").notNull(),
+  ...timestamps,
+}, (table) => [uniqueIndex("economic_events_provider_external_unique").on(table.provider, table.externalId), index("economic_events_time_currency_idx").on(table.scheduledAt, table.currency)]);
+
+export const economicEventRevisions = sqliteTable("economic_event_revisions", {
+  id: text("id").primaryKey(),
+  economicEventId: text("economic_event_id").notNull().references(() => economicEvents.id),
+  revisionHash: text("revision_hash").notNull(),
+  rawJson: text("raw_json").notNull(),
+  observedAt: text("observed_at").notNull(),
+}, (table) => [uniqueIndex("economic_event_revisions_event_hash_unique").on(table.economicEventId, table.revisionHash)]);
+
+export const calendarSyncStates = sqliteTable("calendar_sync_states", {
+  provider: text("provider").primaryKey(),
+  status: text("status").notNull(),
+  fetchedAt: text("fetched_at"),
+  coveredThrough: text("covered_through"),
+  error: text("error"),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const alerts = sqliteTable("alerts", {
   id: text("id").primaryKey(),
   tradingAccountId: text("trading_account_id").notNull().references(() => tradingAccounts.id),
@@ -295,6 +344,12 @@ export const alerts = sqliteTable("alerts", {
   evidenceJson: text("evidence_json").notNull(),
   deduplicationKey: text("deduplication_key").notNull(),
   acknowledgedAt: text("acknowledged_at"),
+  acknowledgedByUserId: text("acknowledged_by_user_id").references(() => users.id),
+  resolvedAt: text("resolved_at"),
+  resolvedByUserId: text("resolved_by_user_id").references(() => users.id),
+  dismissedAt: text("dismissed_at"),
+  dismissedByUserId: text("dismissed_by_user_id").references(() => users.id),
+  resolutionReason: text("resolution_reason"),
   ...timestamps,
 }, (table) => [index("alerts_account_created_idx").on(table.tradingAccountId, table.createdAt), uniqueIndex("alerts_dedupe_unique").on(table.deduplicationKey)]);
 

@@ -147,8 +147,12 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   assert.notEqual(replacementPair.deviceId, paired.deviceId);
   const activeDevices = await testPool.query("SELECT COUNT(*)::integer AS active_devices FROM connector_devices WHERE trading_account_id = $1 AND revoked_at IS NULL", [paired.accountId]);
   assert.equal(activeDevices.rows[0].active_devices, 1);
+  const offlineAt = new Date().toISOString();
+  await testPool.query("INSERT INTO alerts (id, trading_account_id, severity, alert_type, title, evidence_json, deduplication_key, created_at, updated_at) VALUES ('alert_offline_test', $1, 'critical', 'connector.offline', 'Live protection paused', '{}', $2, $3, $3)", [paired.accountId, `${paired.accountId}:offline:test`, offlineAt]);
   const reconnect = await sendEnvelope(worker, env, replacementPair.accessToken, heartbeatEnvelope(replacementPair, 1, `evt_${replacementPair.deviceId}_1`));
   assert.equal(reconnect.status, 202);
+  const resolvedOffline = await testPool.query("SELECT resolved_at FROM alerts WHERE id = 'alert_offline_test'");
+  assert.ok(resolvedOffline.rows[0].resolved_at);
   const firstReconciliation = await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 2, {
     positions: [positionPayload("2001", "100000")],
     pendingOrders: [pendingOrderPayload("3001")],
@@ -168,11 +172,42 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   assert.ok(JSON.parse(firstRiskCalculation.rows[0].input_json).guardian);
   assert.ok(JSON.parse(firstRiskCalculation.rows[0].intermediate_json).resetKey);
   assert.ok(JSON.parse(firstRiskCalculation.rows[0].explanation_json).length >= 2);
+  const calendarFetchedAt = new Date().toISOString();
+  const calendarEventAt = new Date(Date.now() + 60 * 60_000).toISOString();
+  const calendarCoveredThrough = new Date(Date.now() + 2 * 60 * 60_000).toISOString();
+  await testPool.query("INSERT INTO economic_events (id, provider, external_id, title, currency, impact, scheduled_at, forecast, previous, revision_hash, raw_json, fetched_at, created_at, updated_at) VALUES ('econ_ghost', 'faireconomy', 'ghost', 'Removed event', 'USD', 'high', $1, NULL, NULL, 'old-revision', '{}', $2, $2, $2)", [new Date(Date.now() + 30 * 60_000).toISOString(), new Date(Date.now() - 60 * 60_000).toISOString()]);
+  await testPool.query("INSERT INTO economic_events (id, provider, external_id, title, currency, impact, scheduled_at, forecast, previous, revision_hash, raw_json, fetched_at, created_at, updated_at) VALUES ('econ_test_cpi', 'faireconomy', 'test-cpi', 'US CPI', 'USD', 'high', $1, '0.2%', '0.3%', 'revision-test', '{}', $2, $2, $2)", [calendarEventAt, calendarFetchedAt]);
+  await testPool.query("INSERT INTO calendar_sync_states (provider, status, fetched_at, covered_through, error, updated_at) VALUES ('faireconomy', 'healthy', $1, $2, NULL, $1)", [calendarFetchedAt, calendarCoveredThrough]);
   const liveRiskResponse = await api(worker, env, `/api/v1/accounts/${paired.accountId}/live`, { cookie: firstCookie });
   assert.equal(liveRiskResponse.status, 200);
   const liveRiskPayload = await liveRiskResponse.json();
   assert.equal(liveRiskPayload.riskCalculation.engineVersion, "1.0.0");
   assert.equal(liveRiskPayload.riskCalculation.ruleVersionId, ruleVersionId);
+  assert.equal(liveRiskPayload.commandCentre.news.availability, "calculated");
+  assert.equal(liveRiskPayload.commandCentre.news.nextEvent.title, "US CPI");
+  assert.deepEqual(liveRiskPayload.commandCentre.news.nextEvent.affectedSymbols, ["EURUSD"]);
+  assert.equal(liveRiskPayload.commandCentre.news.nextEvent.qualification, "unverified");
+  const savedPlan = await api(worker, env, `/api/v1/accounts/${paired.accountId}/daily-plan`, { method: "PUT", cookie: firstCookie, body: { riskBudgetMinor: "100000", maxRiskPerTradeMinor: "60000", maxTrades: 2, lossStopMinor: "50000", profitLockMinor: "75000", preservationMode: "profit-lock" } });
+  assert.equal(savedPlan.status, 200);
+  assert.equal((await savedPlan.json()).dailyPlan.version, 1);
+  const isolatedPlan = await api(worker, env, `/api/v1/accounts/${paired.accountId}/daily-plan`, { cookie: secondCookie });
+  assert.equal(isolatedPlan.status, 404);
+  const plannedLive = await api(worker, env, `/api/v1/accounts/${paired.accountId}/live`, { cookie: firstCookie });
+  const plannedPayload = await plannedLive.json();
+  assert.equal(plannedPayload.dailyPlan.riskBudgetMinor, "100000");
+  assert.ok(plannedPayload.riskActions.some((action) => action.type === "exposure.trade-limit"));
+  assert.ok(plannedPayload.riskActions.some((action) => action.type === "exposure.combined"));
+  assert.equal(plannedPayload.commandCentre.news.availability, "calculated");
+  assert.equal(plannedPayload.commandCentre.sessions.availability, "unknown");
+  assert.equal(plannedPayload.commandCentre.notifications.activeCount >= 2, true);
+  assert.equal(plannedPayload.commandCentre.tradingDay.historyComplete, false);
+  const action = plannedPayload.riskActions[0];
+  const acknowledged = await api(worker, env, `/api/v1/accounts/${paired.accountId}/risk-actions`, { method: "PATCH", cookie: firstCookie, body: { actionId: action.id, transition: "acknowledge" } });
+  assert.equal(acknowledged.status, 200);
+  const isolatedAction = await api(worker, env, `/api/v1/accounts/${paired.accountId}/risk-actions`, { method: "PATCH", cookie: secondCookie, body: { actionId: action.id, transition: "acknowledge" } });
+  assert.equal(isolatedAction.status, 404);
+  const actionCount = await testPool.query("SELECT COUNT(*)::integer AS count FROM alerts WHERE trading_account_id = $1 AND alert_type LIKE 'exposure.%'", [paired.accountId]);
+  assert.equal(actionCount.rows[0].count, 2);
   const simulation = await api(worker, env, `/api/v1/accounts/${paired.accountId}/simulate`, { method: "POST", cookie: firstCookie, body: { withdrawalMinor: "100000", gapReserveMinor: "5000" } });
   assert.equal(simulation.status, 200);
   const simulationPayload = await simulation.json();
@@ -180,16 +215,29 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   assert.equal(simulationPayload.guardian.scenarios.withdrawal.availability, "calculated");
   const isolatedSimulation = await api(worker, env, `/api/v1/accounts/${paired.accountId}/simulate`, { method: "POST", cookie: secondCookie, body: { withdrawalMinor: "100000" } });
   assert.equal(isolatedSimulation.status, 404);
-  const partialClose = await sendEnvelope(worker, env, replacementPair.accessToken, tradeEnvelope(replacementPair, 3));
+  const missingStopPosition = { ...positionPayload("2001", "100000"), stopLossPricePoints: null };
+  const missingStopSnapshot = await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 3, { positions: [missingStopPosition], pendingOrders: [] }));
+  assert.equal(missingStopSnapshot.status, 202);
+  const missingStopAction = await testPool.query("SELECT id FROM alerts WHERE trading_account_id = $1 AND alert_type = 'stop.missing' AND resolved_at IS NULL", [paired.accountId]);
+  assert.equal(missingStopAction.rowCount, 1);
+  const manuallyResolved = await api(worker, env, `/api/v1/accounts/${paired.accountId}/risk-actions`, { method: "PATCH", cookie: firstCookie, body: { actionId: missingStopAction.rows[0].id, transition: "resolve", reason: "Checking the terminal." } });
+  assert.equal(manuallyResolved.status, 200);
+  const repeatedMissingStop = await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 4, { positions: [missingStopPosition], pendingOrders: [] }));
+  assert.equal(repeatedMissingStop.status, 202);
+  const reopenedMissingStop = await testPool.query("SELECT resolved_at FROM alerts WHERE id = $1", [missingStopAction.rows[0].id]);
+  assert.equal(reopenedMissingStop.rows[0].resolved_at, null);
+  const partialClose = await sendEnvelope(worker, env, replacementPair.accessToken, tradeEnvelope(replacementPair, 5));
   assert.equal(partialClose.status, 202);
-  const secondReconciliation = await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 4, {
+  const secondReconciliation = await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 6, {
     positions: [positionPayload("2001", "60000")],
     pendingOrders: [],
   }));
   assert.equal(secondReconciliation.status, 202);
+  const resolvedMissingStop = await testPool.query("SELECT resolved_at FROM alerts WHERE trading_account_id = $1 AND alert_type = 'stop.missing'", [paired.accountId]);
+  assert.ok(resolvedMissingStop.rows[0].resolved_at);
   const riskHistory = await testPool.query("SELECT output_json FROM risk_calculations WHERE trading_account_id = $1 ORDER BY calculated_at ASC", [paired.accountId]);
-  assert.equal(riskHistory.rowCount, 2);
-  const latestRiskOutput = JSON.parse(riskHistory.rows[1].output_json);
+  assert.equal(riskHistory.rowCount, 4);
+  const latestRiskOutput = JSON.parse(riskHistory.rows[3].output_json);
   assert.equal(latestRiskOutput.consistency.closedTradeCount, 1);
   assert.equal(latestRiskOutput.consistency.bestDayShareBps, 10000);
   const payoutSimulation = await api(worker, env, `/api/v1/accounts/${paired.accountId}/simulate`, { method: "POST", cookie: firstCookie, body: { payoutPeriodStart: new Date(Date.now() - 86_400_000).toISOString(), payoutPeriodEnd: new Date(Date.now() + 86_400_000).toISOString() } });
@@ -209,6 +257,14 @@ test("PostgreSQL connector lifecycle, tenant isolation, replacement, replay, and
   const connection = await testPool.query("SELECT state, last_heartbeat_at FROM account_connections WHERE trading_account_id = $1", [paired.accountId]);
   assert.equal(connection.rows[0].state, "live");
   assert.ok(connection.rows[0].last_heartbeat_at);
+  const movedStop = { ...positionPayload("2001", "60000"), stopLossPricePoints: "109000" };
+  assert.equal((await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 7, { positions: [movedStop], pendingOrders: [] }))).status, 202);
+  assert.equal((await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 8, { positions: [movedStop], pendingOrders: [] }))).status, 202);
+  const persistentMovedStop = await testPool.query("SELECT resolved_at FROM alerts WHERE trading_account_id = $1 AND alert_type = 'stop.moved-away'", [paired.accountId]);
+  assert.equal(persistentMovedStop.rows[0].resolved_at, null);
+  assert.equal((await sendEnvelope(worker, env, replacementPair.accessToken, snapshotEnvelope(replacementPair, 9, { positions: [positionPayload("2001", "60000")], pendingOrders: [] }))).status, 202);
+  const restoredStop = await testPool.query("SELECT resolved_at FROM alerts WHERE trading_account_id = $1 AND alert_type = 'stop.moved-away'", [paired.accountId]);
+  assert.ok(restoredStop.rows[0].resolved_at);
 });
 
 async function createPairingCode(worker, env, cookie, accountId) {

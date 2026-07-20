@@ -47,7 +47,17 @@ The OCI connection-monitor service evaluates stored heartbeats every ten seconds
 
 ## `GET /accounts/{accountId}/live`
 
-Requires browser identity and verifies ownership through the stored user email. Returns account, connection timestamps, latest snapshot, open positions, derived freshness (`live`, `delayed`, `offline`), and an open-risk summary. Each position's `risk_at_stop_minor` is the conservatively rounded additional loss from its current price to stop-loss using the broker-reported tick size and loss tick value. Missing stops or contract metadata return `null`; they are never estimated. It never trusts an organization ID supplied by the caller.
+Requires browser identity and verifies ownership through the stored user email. Returns account, connection timestamps, latest snapshot, open positions, derived freshness (`live`, `delayed`, `offline`), open-risk summary, current broker-day plan, prioritized risk actions, and resolved/dismissed warning history. Each position's `risk_at_stop_minor` is the conservatively rounded additional loss from its current price to stop-loss using the broker-reported tick size and loss tick value. Missing stops or contract metadata return `null`; they are never estimated. Market-close and numeric health outputs remain explicitly unavailable. It never trusts an organization ID supplied by the caller.
+
+The response also includes `commandCentre`: server generation time, sourced news treatment, opt-in unverified Faireconomy high-impact events matched only to exact canonical FX symbols, unavailable broker-session status, a fresh-snapshot broker reset countdown, active account alerts presented as in-app notifications, and unavailable named-session analytics. Provider impact never activates a firm rule window: qualification remains `unverified` until reviewed FundedNext event criteria exist. A stale, failed, or expired feed is returned as `unknown`, never as a clear market window.
+
+## `GET|PUT /accounts/{accountId}/daily-plan`
+
+Requires browser identity and account ownership. The server derives the broker reset key and plan version. `PUT` accepts canonical minor-unit risk budget, max-risk, loss-stop and profit-lock strings, a bounded max-trades integer, and `off`, `manual`, or `profit-lock` preservation mode.
+
+## `GET|PATCH /accounts/{accountId}/risk-actions`
+
+Requires browser identity and account ownership. `GET` returns up to 200 current and historical actions. `PATCH` accepts an owned action ID plus `acknowledge`, `resolve`, or `dismiss`; dismissal requires a reason. Active telemetry reopens resolved conditions, while dismissal suppresses that action for the broker day.
 
 ## `GET /accounts`
 
@@ -55,4 +65,4 @@ Requires browser identity. Returns up to 50 account workspaces owned by the sign
 
 ## Future contracts
 
-Admin rule CRUD/approval, account SSE, alerts, audit export, deletion/export, and installer update manifests are deliberately not exposed until their authorization and operational controls are implemented.
+Account SSE, audit export, deletion/export, and installer update manifests are deliberately not exposed until their authorization and operational controls are implemented.

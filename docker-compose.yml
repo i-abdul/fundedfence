@@ -25,6 +25,20 @@ services:
       app:
         condition: service_started
 
+  calendar:
+    image: fundedfence-app:local
+    restart: unless-stopped
+    command: ["npm", "run", "monitor:calendar"]
+    env_file:
+      - .env.oci
+    environment:
+      POSTGRES_URL: postgres://fundedfence:${POSTGRES_PASSWORD}@db:5432/fundedfence
+    depends_on:
+      db:
+        condition: service_healthy
+      app:
+        condition: service_started
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped

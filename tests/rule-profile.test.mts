@@ -40,3 +40,13 @@ test("invalid account-size applicability is rejected", () => {
   invalid.applicableAccountSizesMinor = ["$100,000"];
   assert.throws(() => validateRuleDefinition(invalid), /account-size applicability/);
 });
+
+test("validates sourced news treatment metadata", () => {
+  const challenge = fundedNextRuleProfiles.find((profile) => profile.definition.phase === "Phase 1")!;
+  assert.equal(challenge.definition.news.mode, "allowed");
+  const funded = fundedNextRuleProfiles.find((profile) => profile.definition.phase === "Funded")!;
+  assert.deepEqual(funded.definition.news, { mode: "allowed-reward-adjustment", windowMinutesBefore: 5, windowMinutesAfter: 5, qualifyingProfitBps: 4_000, affectedInstrumentsOnly: true });
+  const invalid = structuredClone(funded.definition);
+  invalid.news.windowMinutesBefore = -1;
+  assert.throws(() => validateRuleDefinition(invalid), /news metadata/i);
+});

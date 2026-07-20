@@ -9,14 +9,15 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "node --test tests/drawdown.test.mts tests/position-risk.test.mts tests/pairing.test.mts tests/connector-protocol.test.mts tests/rule-profile.test.mts tests/risk-guardian.test.mts tests/consistency.test.mts",
+    "test": "node --test tests/drawdown.test.mts tests/position-risk.test.mts tests/pairing.test.mts tests/connector-protocol.test.mts tests/rule-profile.test.mts tests/risk-guardian.test.mts tests/consistency.test.mts tests/daily-risk.test.mts tests/economic-calendar.test.mts",
     "test:integration": "node --test tests/rendered-html.test.mjs",
     "test:postgres": "node --test tests/postgres-lifecycle.test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate:postgres": "node scripts/migrate-postgres.mjs",
-    "monitor:connections": "node scripts/monitor-connections.mjs"
+    "monitor:connections": "node scripts/monitor-connections.mjs",
+    "monitor:calendar": "node scripts/monitor-calendar.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

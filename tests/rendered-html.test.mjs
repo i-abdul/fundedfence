@@ -36,6 +36,27 @@ test("protects authenticated product pages", async () => {
   assert.match(rulesResponse.headers.get("location") ?? "", /\/login\?return_to=%2Frules/);
 });
 
+test("renders the daily risk command centre for an authenticated workspace", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-command-centre`);
+  const { default: worker } = await import(workerUrl.href);
+  const response = await worker.fetch(
+    new Request("http://localhost/dashboard", { headers: { accept: "text/html", cookie: await testSessionCookie() } }),
+    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
+    { waitUntil() {}, passThroughOnException() {} },
+  );
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /Today’s plan/);
+  assert.match(html, /Priority actions/);
+  assert.match(html, /News &amp; sessions/);
+  assert.match(html, /Trading day/);
+  assert.match(html, /Notifications/);
+  assert.match(html, /Session performance/);
+  assert.match(html, /Read-only/);
+  assert.doesNotMatch(html, /Live account health score \d+/i);
+});
+
 test("renders FundedNext account setup options", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-fundednext-setup`);

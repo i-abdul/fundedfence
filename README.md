@@ -29,7 +29,7 @@ Open `http://localhost:3000`. To exercise authenticated write flows, configure t
 
 ## OCI Docker deployment
 
-The OCI target is Docker Compose with the app, PostgreSQL, and Caddy reverse proxy. It defaults to host ports `8080` and `8443` so it can sit beside PTA until we decide whether port `80` is free.
+The OCI target is Docker Compose with the app, PostgreSQL, Caddy reverse proxy, connection monitor, and opt-in calendar monitor. It defaults to host ports `8080` and `8443` so it can sit beside PTA until we decide whether port `80` is free.
 
 ```text
 cp deploy/env.oci.example .env.oci
