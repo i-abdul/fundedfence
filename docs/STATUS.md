@@ -9,7 +9,7 @@ Updated: 2026-07-20
 - Sprint 3: generalized drawdown guardians, high-water/reset state, consistency observations, what-if simulations, immutable calculation records, and live dashboard risk output.
 - Sprint 4 foundation: saved daily plans, prioritized evidence-backed risk actions, action lifecycle/history, and command-centre dashboard controls.
 - Ten FundedNext program/phase profiles are effective, including Free Trial v1 and Stellar Instant v2.
-- The OCI Docker deployment runs the application, connection monitor, calendar monitor, PostgreSQL, and Caddy; production revision `b7ee92c` passed migration, lifecycle, calendar-sync, public-route, and authentication checks.
+- The OCI Docker deployment runs the application, connection monitor, calendar monitor, PostgreSQL, and Caddy; the current production release passed migration, lifecycle, calendar-sync, public-route, and authentication checks.
 
 ## Live acceptance
 
